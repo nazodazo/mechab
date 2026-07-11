@@ -256,11 +256,12 @@ var MECHAB = window.MECHAB || (window.MECHAB = {});
     var ty  = hipY - 3 - sp.torsoH;
     var Tfar = Tl===T_DEAD ? T_DEAD : T_FAR;
 
-    // far leg (mech's right — behind, up a step)
+    // far leg (mech's right — behind, planted on the same ground line)
     var flx = fcx + sp.stance - 2;
-    panel(g, flx, hipY-2, sp.legW, kneeY-hipY, Tfar, false);
-    panel(g, flx+1, kneeY-1, sp.legW, GROUND-4-(kneeY-1), Tfar, false);
-    panel(g, flx, GROUND-5, sp.legW+3, 3, Tfar, true);
+    panel(g, flx, hipY, sp.legW, kneeY-hipY+1, Tfar, false);
+    rect (g, flx, kneeY+1, sp.legW, 1, Tfar.d);
+    panel(g, flx+1, kneeY+2, sp.legW, GROUND-3-(kneeY+2), Tfar, false);
+    panel(g, flx, GROUND-3, sp.legW+3, 3, Tfar, true);
 
     // far shoulder sliver (mech's right)
     panel(g, fcx+(fw>>1)-1, ty-1, 4, sp.shoH, Ts.ARM_R, false);
@@ -305,15 +306,16 @@ var MECHAB = window.MECHAB || (window.MECHAB = {});
     else { rect(g, fcx-1, hy0-4, 1, sp.headH+2, Th.d); set(g, fcx-1, hy0-4, Th.a);
            rect(g, fcx-(hw>>1)+1, hy0+2, hw-2, 1, Th.a); }
 
-    // near shoulder + arm + weapon (armed side shown, like the side view)
+    // near shoulder + arm + weapon (hangs vertical like the front view,
+    // so the barrel clears the torso instead of crossing it)
     var slot = fit.ARM_L !== "arm_none" ? "ARM_L" : "ARM_R";
     var pid = fit[slot], Ta = Ts[slot];
     var sx = lx - sp.shoW + 2;
     panel(g, sx, ty-2, sp.shoW+1, sp.shoH+1, Ta, sp.shoRound);
     rect (g, sx+2, ty+sp.shoH-1, 3, 2, Ta.d);
-    panel(g, sx+1, ty+sp.shoH+1, 5, 8, Ta, false);
-    if (pid && pid !== "arm_none") weaponSide(g, pid, sx+4, ty+sp.shoH+8, Ta, ar);
-    else rect(g, sx+2, ty+sp.shoH+9, 3, 3, Ta.d);
+    panel(g, sx+1, ty+sp.shoH+1, 5, 9, Ta, false);
+    if (pid && pid !== "arm_none") weaponFront(g, pid, -1, sx+2, ty+sp.shoH+10, Ta, ar);
+    else rect(g, sx+2, ty+sp.shoH+10, 3, 3, Ta.d);
   }
 
   // ================= renderer =================
