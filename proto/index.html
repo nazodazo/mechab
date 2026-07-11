@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+<title>WARCLOCK // proto v1</title>
+<style>
+/* WARCLOCK proto — brutalist instrument panel. Fixed viewport, zero scroll.
+   Layout contract: heatmap 30% / trendline 10% / infomatics 30% / options rest. */
+:root{
+  --bg:#0a0a0c; --panel:#111114; --ink:#e8e4d8; --dim:#6f6c62; --line:#26262b;
+  --us:#d8ff3d;            /* acid — our control */
+  --foe:#ff5a2a;           /* hot — enemy control */
+  --mono:"SF Mono",ui-monospace,"Cascadia Mono","Roboto Mono",Consolas,monospace;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0}
+html,body{height:100%;overflow:hidden}
+body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
+  font-family:var(--mono);font-size:12px;line-height:1.35;
+  -webkit-user-select:none;user-select:none;overscroll-behavior:none;
+  display:flex;justify-content:center}
+@supports (height:100dvh){ html,body{height:100dvh} }
+
+#device{width:100%;max-width:460px;height:100%;display:flex;flex-direction:column;
+  padding:calc(6px + env(safe-area-inset-top)) 10px calc(8px + env(safe-area-inset-bottom))}
+
+#topbar{display:flex;gap:8px;align-items:baseline;color:var(--dim);font-size:11px;
+  letter-spacing:.08em;padding:2px 0 6px}
+#bclock{color:var(--ink);font-variant-numeric:tabular-nums}
+#phase{flex:1;text-align:center;overflow:hidden;white-space:nowrap}
+#tidepct{color:var(--us);font-variant-numeric:tabular-nums}
+
+#map{width:100%;height:30%;flex:none;image-rendering:pixelated;display:block;
+  border:1px solid var(--line);touch-action:none}
+#trend{width:100%;height:10%;flex:none;display:block;border:1px solid var(--line);border-top:0}
+
+#info{height:30%;flex:none;padding:7px 2px 4px;display:flex;flex-direction:column;gap:5px;
+  overflow:hidden}
+#stats{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.stat{border:1px solid var(--line);padding:4px 6px}
+.stat .k{color:var(--dim);font-size:9px;letter-spacing:.12em}
+.stat .v{font-size:15px;font-variant-numeric:tabular-nums}
+.stat.low .v{color:var(--foe)}
+#detail{border-left:3px solid var(--line);padding:2px 8px;color:var(--dim);
+  white-space:pre-wrap;font-size:11px;min-height:2.7em}
+#detail b{color:var(--ink);font-weight:400}
+#feed{flex:1;overflow:hidden;font-size:11px;color:var(--dim)}
+#feed .up{color:var(--us)} #feed .down{color:var(--foe)} #feed .sys{color:var(--ink)}
+#feed div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+#hangbox{border:1px solid var(--foe);padding:4px 8px;display:none}
+#hangbox.on{display:block}
+#hangbox .t{color:var(--foe);letter-spacing:.1em;font-size:10px}
+#lev{height:6px;background:var(--panel);margin-top:3px}
+#lev i{display:block;height:100%;background:var(--foe);width:100%}
+
+#options{flex:1;display:flex;flex-direction:column;gap:5px;padding-top:6px;
+  border-top:1px solid var(--line)}
+#opthead{color:var(--dim);font-size:10px;letter-spacing:.16em}
+#optlist{flex:1;display:flex;flex-direction:column;gap:5px;overflow:hidden}
+.opt{display:flex;justify-content:space-between;align-items:center;width:100%;
+  background:transparent;border:1px solid var(--line);color:var(--ink);
+  font-family:var(--mono);font-size:13px;padding:9px 12px;text-align:left;
+  touch-action:manipulation;cursor:pointer}
+.opt:active{background:var(--ink);color:var(--bg)}
+.opt[disabled]{opacity:.3}
+.opt .cost{color:var(--dim);font-size:10px}
+#footer{display:none;gap:6px}
+#footer.on{display:flex}
+#footer button{flex:1;padding:12px;font-family:var(--mono);font-size:13px;letter-spacing:.14em;
+  background:transparent;border:1px solid var(--line);color:var(--ink);touch-action:manipulation}
+#btnenter{border-color:var(--us);color:var(--us)}
+#btnenter[disabled]{opacity:.3}
+#footer button:active{background:var(--ink);color:var(--bg)}
+
+#debrief{position:absolute;inset:0;background:rgba(10,10,12,.96);display:none;
+  flex-direction:column;padding:40px 24px;gap:10px}
+#debrief.on{display:flex}
+#debrief h2{font-size:18px;font-weight:400;letter-spacing:.1em}
+#receipts{flex:1;overflow-y:auto;font-size:11px;color:var(--dim);white-space:pre-wrap}
+#receipts b{color:var(--ink);font-weight:400}
+#again{padding:14px;background:transparent;border:1px solid var(--us);color:var(--us);
+  font-family:var(--mono);letter-spacing:.14em;font-size:13px}
+</style>
+</head>
+<body>
+<main id="device">
+  <div id="topbar"><span id="bclock">90.0</span><span id="phase">THEATRE 7 // LIVE</span><span id="tidepct">—</span></div>
+  <canvas id="map"></canvas>
+  <canvas id="trend"></canvas>
+  <section id="info">
+    <div id="stats"></div>
+    <div id="hangbox"><span class="t">CONTESTED — RESOLVING</span><span id="hangname"></span><div id="lev"><i></i></div></div>
+    <div id="detail">tap the map to read a sector.</div>
+    <div id="feed"></div>
+  </section>
+  <section id="options">
+    <div id="opthead">COMMAND</div>
+    <div id="optlist"></div>
+    <div id="footer"><button id="btnreturn">◂ RETURN</button><button id="btnenter" disabled>ENTER ▸</button></div>
+  </section>
+  <div id="debrief"><h2 id="verdict">—</h2><div id="receipts"></div><button id="again">RE-RUN THEATRE</button></div>
+</main>
+
+<script>
+"use strict";
+/* ================= sim state ================= */
+var GW=20, GH=8;                       // sector grid
+var S;                                  // run state
+function reset(){
+  S = {
+    t:90, over:false,
+    grid:new Float32Array(GW*GH),      // control -1 foe .. +1 us
+    troops:1200, mecha:3, cas:4, req:400,
+    hang:null,                         // {i, endsAt, dur, name, committed}
+    sel:-1, tide:0, hist:[],
+    mode:"root", pending:null, target:-1,
+    receipts:[], nextHang: 6 + Math.random()*4,
+  };
+  for (var y=0;y<GH;y++) for (var x=0;x<GW;x++){
+    var f = x/(GW-1);                  // left ours, right theirs, middle contested
+    S.grid[y*GW+x] = Math.max(-1,Math.min(1, (0.5-f)*2.2 + (Math.random()-0.5)*0.6 ));
+  }
+  logf("THEATRE 7 OPEN — pressure holds the west.","sys");
+}
+function tide(){ var s=0; for (var i=0;i<GW*GH;i++) s+=S.grid[i]; return s/(GW*GH); }
+function contested(i){ return Math.abs(S.grid[i])<0.35; }
+function frontier(){ var a=[]; for (var i=0;i<GW*GH;i++) if (contested(i)) a.push(i); return a; }
+function fat(){ var r=Math.random(); return r<0.05 ? 4 : r<0.15 ? 2 : 1; }   // fat tail
+
+/* build pressure — stands in for the build phase; tweak to feel it */
+var PRESSURE = 0.06;
+
+/* ================= warclock ================= */
+var lastTick=0, tickEvery=0.6;
+function advance(dt){
+  if (S.over) return;
+  S.t -= dt; lastTick += dt;
+  S.req += dt * captured()*0.4;
+
+  if (lastTick>=tickEvery){ lastTick=0; microTick(); }
+
+  if (!S.hang){
+    S.nextHang -= dt;
+    if (S.nextHang<=0) openHang();
+  } else if (S.t < 90 - 0.0001 && performance.now()/1000 > S.hang.endsAt){
+    resolveHang();
+  }
+
+  S.tide = tide(); S.hist.push(S.tide);
+  if (S.t<=0 || Math.abs(S.tide)>0.85) end();
+}
+function captured(){ var n=0; for (var i=0;i<GW*GH;i++) if (S.grid[i]>0.5) n++; return n; }
+function microTick(){
+  var f=frontier(); if (!f.length) return;
+  var i=f[(Math.random()*f.length)|0];
+  var d=(PRESSURE + (Math.random()-0.55)*0.18)*fat();
+  S.grid[i]=Math.max(-1,Math.min(1,S.grid[i]+d));
+  bleed(i,d*0.3);
+  if (Math.abs(d)>0.2) logf((d>0?"▲":"▼")+" sector "+sname(i)+" "+(d>0?"+":"")+d.toFixed(2), d>0?"up":"down");
+  if (d<-0.15) S.troops=Math.max(0,S.troops-((Math.random()*40)|0));
+}
+function bleed(i,d){                          // second-order: pressure leaks to neighbours
+  var x=i%GW,y=(i/GW)|0;
+  [[1,0],[-1,0],[0,1],[0,-1]].forEach(function(o){
+    var nx=x+o[0],ny=y+o[1];
+    if (nx<0||nx>=GW||ny<0||ny>=GH) return;
+    var j=ny*GW+nx; S.grid[j]=Math.max(-1,Math.min(1,S.grid[j]+d*0.5));
+  });
+}
+function openHang(){
+  var f=frontier(); if (!f.length){ S.nextHang=4; return; }
+  var i=f[(Math.random()*f.length)|0];
+  var dur=4.5+Math.random()*2;
+  S.hang={ i:i, dur:dur, endsAt:performance.now()/1000+dur, committed:0,
+           name:["ARMOURED PROBE","BREACH ATTEMPT","MECHA DUEL","ENCIRCLEMENT"][(Math.random()*4)|0] };
+  logf("◈ "+S.hang.name+" @ "+sname(i)+" — RESOLVING","sys");
+}
+function leverage(){                           // remaining influence 1→0 across the hang
+  if (!S.hang) return 0;
+  return Math.max(0,(S.hang.endsAt-performance.now()/1000)/S.hang.dur);
+}
+function resolveHang(){
+  var h=S.hang; S.hang=null; S.nextHang=7+Math.random()*6;
+  var swing=(PRESSURE*3 + h.committed + (Math.random()-0.5)*0.5)*fat();
+  var before=S.tide;
+  S.grid[h.i]=Math.max(-1,Math.min(1,S.grid[h.i]+swing));
+  bleed(h.i,swing*0.6);
+  var won=swing>0;
+  logf((won?"▲ ":"▼ ")+h.name+" "+(won?"HELD":"LOST")+" @ "+sname(h.i),(won?"up":"down"));
+  S.receipts.push("◈ "+h.name+" @ "+sname(h.i)+" — "+(won?"HELD":"LOST")
+    +(h.committed?("  <b>(your commit: "+(h.committed>0?"+":"")+h.committed.toFixed(2)+")</b>"):"  (no intervention)"));
+  if (!won) S.troops=Math.max(0,S.troops-100);
+}
+function end(){
+  S.over=true;
+  var v = S.tide>0.3?"LANDSLIDE — THEATRE TAKEN": S.tide>0?"MARGINAL HOLD":
+          S.tide>-0.3?"MARGINAL LOSS":"COLLAPSE";
+  document.getElementById("verdict").textContent=v;
+  document.getElementById("receipts").innerHTML =
+    "FINAL TIDE "+(S.tide*100).toFixed(0)+"%\nTROOPS REMAINING "+S.troops+"\nREQ BANKED "+(S.req|0)
+    +"\n\n"+ (S.receipts.length?S.receipts.join("\n"):"(no contested events)");
+  document.getElementById("debrief").classList.add("on");
+}
+
+/* ================= commands ================= */
+var CMDS = [
+  { id:"COMMIT", label:"COMMIT TROOPS",  cost:"−150 troops", needsTarget:true,
+    can:function(){return S.troops>=150;},
+    run:function(i){ S.troops-=150; strike(i,0.25,"COMMIT"); } },
+  { id:"CAS",    label:"CAS STRIKE",     cost:"−1 sortie −120 req", needsTarget:true,
+    can:function(){return S.cas>0 && S.req>=120;},
+    run:function(i){ S.cas--; S.req-=120; strike(i,0.45,"CAS"); } },
+  { id:"MECHA",  label:"ADVANCE MECHA",  cost:"−1 mecha readiness", needsTarget:true,
+    can:function(){return S.mecha>0;},
+    run:function(i){ S.mecha--; strike(i,0.35,"MECHA"); } },
+  { id:"HOLD",   label:"HOLD",           cost:"free — logged", needsTarget:false,
+    can:function(){return true;},
+    run:function(){ logf("DIRECTOR HOLDS.","sys"); S.receipts.push("HOLD @ "+(90-S.t).toFixed(0)+"s — reserves banked"); } },
+];
+function strike(i,base,tag){
+  var lev = (S.hang && S.hang.i===i) ? (0.4+leverage()*0.6) : 0.55;   // in-hang timing pays
+  var eff = base*lev*fat();
+  if (S.hang && S.hang.i===i) S.hang.committed += eff;
+  else { S.grid[i]=Math.max(-1,Math.min(1,S.grid[i]+eff)); bleed(i,eff*0.4); }
+  logf("▸ "+tag+" @ "+sname(i)+" — weight "+eff.toFixed(2)+(S.hang&&S.hang.i===i?" (contest)":""),"up");
+  S.receipts.push("▸ "+tag+" @ "+sname(i)+" — <b>+"+eff.toFixed(2)+"</b> at "+(90-S.t).toFixed(0)+"s");
+}
+function sname(i){ return String.fromCharCode(65+((i/GW)|0))+"-"+(i%GW+1); }
+
+/* ================= UI ================= */
+var mapC=document.getElementById("map"), trC=document.getElementById("trend");
+var mctx=mapC.getContext("2d"), tctx=trC.getContext("2d");
+function fit(c){ var r=c.getBoundingClientRect(),d=window.devicePixelRatio||1;
+  c.width=r.width*d; c.height=r.height*d; }
+function renderMap(){
+  var W=mapC.width,H=mapC.height,cw=W/GW,ch=H/GH,now=performance.now()/1000;
+  mctx.fillStyle="#0a0a0c"; mctx.fillRect(0,0,W,H);
+  for (var y=0;y<GH;y++) for (var x=0;x<GW;x++){
+    var i=y*GW+x,v=S.grid[i];
+    if (v>0.05){ mctx.fillStyle="rgba(216,255,61,"+(0.12+v*0.75)+")"; }
+    else if (v<-0.05){ mctx.fillStyle="rgba(255,90,42,"+(0.12-v*0.75)+")"; }
+    else mctx.fillStyle="#141416";
+    mctx.fillRect(x*cw+1,y*ch+1,cw-2,ch-2);
+    if (contested(i)){                                        // conquerable pulse
+      var p=0.25+0.2*Math.sin(now*5+i);
+      mctx.fillStyle="rgba(232,228,216,"+p+")";
+      mctx.fillRect(x*cw+cw*0.35,y*ch+ch*0.35,cw*0.3,ch*0.3);
+    }
+  }
+  if (S.hang){ box(S.hang.i,"#ff5a2a",3); }
+  if (S.target>=0){ box(S.target,"#d8ff3d",3); }
+  else if (S.sel>=0){ box(S.sel,"#e8e4d8",2); }
+  function box(i,c,w){ var x=i%GW,y=(i/GW)|0;
+    mctx.strokeStyle=c; mctx.lineWidth=w; mctx.strokeRect(x*cw+1,y*ch+1,cw-2,ch-2); }
+}
+function renderTrend(){
+  var W=trC.width,H=trC.height;
+  tctx.fillStyle="#0a0a0c"; tctx.fillRect(0,0,W,H);
+  tctx.strokeStyle="#26262b"; tctx.setLineDash([3,4]);
+  tctx.beginPath(); tctx.moveTo(0,H/2); tctx.lineTo(W,H/2); tctx.stroke(); tctx.setLineDash([]);
+  if (S.hist.length<2) return;
+  tctx.strokeStyle = S.tide>=0 ? "#d8ff3d" : "#ff5a2a"; tctx.lineWidth=2;
+  tctx.beginPath();
+  var n=S.hist.length, step=Math.max(1,(n/W)|0);
+  for (var k=0,px=0;k<n;k+=step,px++){
+    var yy=H/2 - S.hist[k]*(H/2*0.9);
+    k===0?tctx.moveTo(0,yy):tctx.lineTo(px*(W/(n/step)),yy);
+  }
+  tctx.stroke();
+}
+function renderInfo(){
+  var st=[["REQ",S.req|0,S.req<120],["TROOPS",S.troops,S.troops<200],
+          ["MECHA",S.mecha,S.mecha===0],["CAS",S.cas,S.cas===0]];
+  document.getElementById("stats").innerHTML = st.map(function(s){
+    return '<div class="stat'+(s[2]?" low":"")+'"><div class="k">'+s[0]+'</div><div class="v">'+s[1]+'</div></div>';
+  }).join("");
+  var hb=document.getElementById("hangbox");
+  if (S.hang){ hb.classList.add("on");
+    document.getElementById("hangname").textContent=" "+S.hang.name+" @ "+sname(S.hang.i);
+    hb.querySelector("#lev i").style.width=(leverage()*100)+"%";
+  } else hb.classList.remove("on");
+  var d=document.getElementById("detail");
+  if (S.mode==="target") d.innerHTML="<b>"+S.pending.label+"</b> — tap target sector, then ENTER."+(S.target>=0?" ["+sname(S.target)+"]":"");
+  else if (S.sel>=0){ var v=S.grid[S.sel];
+    d.innerHTML="SECTOR <b>"+sname(S.sel)+"</b> // control "+(v*100|0)+"% "
+      +(v>0.05?"<b>OURS</b>":v<-0.05?"HOSTILE":"<b>CONTESTED</b>")
+      +(contested(S.sel)?"\nconquerable — pressure applies.":"");
+  } else d.textContent="tap the map to read a sector.";
+  document.getElementById("bclock").textContent=Math.max(0,S.t).toFixed(1);
+  var tp=document.getElementById("tidepct");
+  tp.textContent=(S.tide>=0?"+":"")+(S.tide*100).toFixed(0)+"%";
+  tp.style.color=S.tide>=0?"#d8ff3d":"#ff5a2a";
+}
+var feedLines=[];
+function logf(m,cls){ feedLines.unshift('<div class="'+(cls||"")+'">'+m+'</div>');
+  if (feedLines.length>4) feedLines.pop();
+  document.getElementById("feed").innerHTML=feedLines.join(""); }
+
+function renderOptions(){
+  var list=document.getElementById("optlist"), foot=document.getElementById("footer");
+  if (S.mode==="root"){
+    foot.classList.remove("on");
+    list.innerHTML=CMDS.map(function(c,k){
+      return '<button class="opt" data-k="'+k+'"'+(c.can()?"":" disabled")+'>'
+        +'<span>'+c.label+'</span><span class="cost">'+c.cost+'</span></button>';
+    }).join("");
+  } else {
+    list.innerHTML=""; foot.classList.add("on");
+    document.getElementById("btnenter").disabled = S.pending.needsTarget && S.target<0;
+  }
+}
+document.getElementById("optlist").addEventListener("click",function(e){
+  var b=e.target.closest(".opt"); if(!b||S.over)return;
+  var c=CMDS[+b.dataset.k]; if(!c.can())return;
+  if (!c.needsTarget){ c.run(); return; }
+  S.mode="target"; S.pending=c; S.target = (S.hang?S.hang.i:-1);   // default to the live contest
+  renderOptions();
+});
+document.getElementById("btnreturn").addEventListener("click",function(){
+  S.mode="root"; S.pending=null; S.target=-1; renderOptions();
+});
+document.getElementById("btnenter").addEventListener("click",function(){
+  if (S.pending && (!S.pending.needsTarget || S.target>=0)){
+    S.pending.run(S.target);
+    S.mode="root"; S.pending=null; S.target=-1; renderOptions();
+  }
+});
+mapC.addEventListener("pointerdown",function(e){
+  var r=mapC.getBoundingClientRect();
+  var x=((e.clientX-r.left)/r.width*GW)|0, y=((e.clientY-r.top)/r.height*GH)|0;
+  var i=Math.max(0,Math.min(GW*GH-1,y*GW+x));
+  if (S.mode==="target") S.target=i; else S.sel=i;
+  renderOptions();
+});
+document.getElementById("again").addEventListener("click",function(){
+  document.getElementById("debrief").classList.remove("on");
+  feedLines=[]; reset(); renderOptions();
+});
+
+/* ================= loop ================= */
+var last=performance.now();
+function loop(now){
+  var dt=Math.min(0.1,(now-last)/1000); last=now;
+  advance(dt); renderMap(); renderTrend(); renderInfo();
+  requestAnimationFrame(loop);
+}
+window.addEventListener("resize",function(){ fit(mapC); fit(trC); });
+reset(); fit(mapC); fit(trC); renderOptions(); requestAnimationFrame(loop);
+</script>
+</body>
+</html>
