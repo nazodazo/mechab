@@ -1,5 +1,5 @@
 /* sw.js — offline cache. Bump VERSION on any file change so clients refresh. */
-var VERSION = "mechab-v3";
+var VERSION = "mechab-v4";
 var ASSETS = [
   ".",
   "index.html",
