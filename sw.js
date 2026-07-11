@@ -1,5 +1,5 @@
 /* sw.js — offline cache. Bump VERSION on any file change so clients refresh. */
-var VERSION = "mechab-v2";
+var VERSION = "mechab-v3";
 var ASSETS = [
   ".",
   "index.html",
@@ -30,11 +30,13 @@ self.addEventListener("activate", function (e){
   self.clients.claim();
 });
 
-// network-first, cache fallback: dev iterations stay fresh, offline still works
+// network-first, cache fallback: dev iterations stay fresh, offline still works.
+// cache:"no-cache" revalidates past the HTTP cache — GitHub Pages sends
+// max-age=600, which otherwise serves stale files for up to 10 minutes.
 self.addEventListener("fetch", function (e){
   if (e.request.method !== "GET") return;
   e.respondWith(
-    fetch(e.request).then(function (res){
+    fetch(e.request, { cache: "no-cache" }).then(function (res){
       var copy = res.clone();
       caches.open(VERSION).then(function (c){ c.put(e.request, copy); });
       return res;
