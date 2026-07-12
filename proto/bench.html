@@ -193,25 +193,93 @@ var NODES;  // station boxes, laid out as a loop
 function fit(){ var r=sc.getBoundingClientRect(),d=window.devicePixelRatio||1;
   sc.width=r.width*d; sc.height=r.height*d;
   var W=sc.width,H=sc.height,bw=W*0.26,bh=H*0.2;
+  // stations dock on the edges, wired to the ring
   NODES={
-    CORE:      {x:W*0.5-bw/2, y:H*0.40-bh/2, w:bw,h:bh},
-    INJECTOR:  {x:W*0.08,     y:H*0.08,      w:bw,h:bh},
-    COOLANT:   {x:W*0.66,     y:H*0.08,      w:bw,h:bh},
-    EXCHANGER: {x:W*0.66,     y:H*0.72,      w:bw,h:bh},
-    GOVERNOR:  {x:W*0.08,     y:H*0.72,      w:bw,h:bh},
+    CORE:      {x:6,        y:H*0.06,  w:bw,h:bh},
+    INJECTOR:  {x:6,        y:H*0.42,  w:bw,h:bh},
+    GOVERNOR:  {x:6,        y:H*0.78,  w:bw,h:bh},
+    COOLANT:   {x:W-bw-6,   y:H*0.06,  w:bw,h:bh},
+    EXCHANGER: {x:W-bw-6,   y:H*0.78,  w:bw,h:bh},
   };
 }
-function lineColor(v,lo,hi){ return v<lo?"#ff5a2a":v<hi?"#3d5a80":"#d8ff3d"; }
-function renderSchem(){
+function heatColor(margin){          // green -> amber -> red as margin thins
+  return margin>=4?"216,255,61":margin>=1.5?"255,182,61":"255,90,42";
+}
+var phase=0, coreP=0, scramFlash=0;
+function renderReactor(dt){
   var W=sc.width,H=sc.height,d=window.devicePixelRatio||1;
+  var cx=W*0.5, cy=H*0.5, R=Math.min(W,H)*0.30;
+  // effective load: live ramp during a test, else the dial
+  var T=S.testing;
+  var load = T ? S.op*Math.min(1,T.t/(T.dur*0.55)) : S.op;
+  var m=metrics(load);
+  var outN=Math.max(0,Math.min(1,m.out/14));
+  var jit =Math.max(0,Math.min(1,0.55-m.stab));
+  var dead = T&&T.fault;
+  phase += dt*(dead?0.15:(0.4+load*2.6));                 // spool speed = load
+  coreP += dt*(2+load*7);
+  if (dead) scramFlash=Math.min(1,scramFlash+dt*4); else scramFlash=Math.max(0,scramFlash-dt*2);
+
   sctx.fillStyle="#101014"; sctx.fillRect(0,0,W,H);
-  var m=metrics(S.op), p=parts();
-  // flow lines: injector->core (feed), core->coolant->exchanger (thermal), governor->core
-  link("INJECTOR","CORE", lineColor(m.stab,0.2,0.45));
-  link("CORE","COOLANT",  lineColor(m.margin,1.5,4));
-  link("COOLANT","EXCHANGER", lineColor(m.margin,1.5,4));
-  link("GOVERNOR","CORE", "#3d5a80");
-  link("EXCHANGER","GOVERNOR","#232329");
+
+  // station tethers
+  ORDER.forEach(function(s){
+    var n=NODES[s];
+    sctx.strokeStyle="#232329"; sctx.lineWidth=1.5;
+    sctx.beginPath(); sctx.moveTo(n.x+n.w/2,n.y+n.h/2); sctx.lineTo(cx,cy); sctx.stroke();
+  });
+
+  // outer condition dial: 3/4 sweep of the load range, colored by viability
+  var A0=Math.PI*0.75, SW=Math.PI*1.5, R2=R*1.38;
+  for (var t=0;t<40;t++){
+    var L=0.1+ (t/39)*0.8, mm=metrics(L);
+    var ok = mm.margin>=1.5 && mm.stab>=0.2;
+    var good = mm.margin>=4 && mm.stab>=0.45 && mm.out>=7;
+    sctx.strokeStyle = good?"rgba(216,255,61,.9)": ok?"rgba(61,90,128,.9)":"rgba(255,90,42,.75)";
+    sctx.lineWidth=4*d;
+    var a=A0+SW*(t/40), a2=A0+SW*((t+0.8)/40);
+    sctx.beginPath(); sctx.arc(cx,cy,R2,a,a2); sctx.stroke();
+  }
+  // needle at current load
+  var na=A0+SW*((load-0.1)/0.8);
+  sctx.strokeStyle="#e8e4d8"; sctx.lineWidth=2*d;
+  sctx.beginPath();
+  sctx.moveTo(cx+Math.cos(na)*(R2-7*d), cy+Math.sin(na)*(R2-7*d));
+  sctx.lineTo(cx+Math.cos(na)*(R2+7*d), cy+Math.sin(na)*(R2+7*d));
+  sctx.stroke();
+
+  // the torus: 24 segments, 3 rotating activation lobes
+  var SEGS=24, hc=heatColor(m.margin);
+  for (var i=0;i<SEGS;i++){
+    var th=i/SEGS*Math.PI*2;
+    var lobe=Math.pow(Math.max(0,Math.cos(3*(th-phase))),2);     // 3 hot lobes chase
+    var b=dead?0.06:(0.10+lobe*0.9*(0.25+outN*0.75));
+    var jr=(Math.random()-0.5)*jit*8*d;
+    var x=cx+Math.cos(th)*(R+jr), y=cy+Math.sin(th)*(R+jr);
+    var sz=(5+lobe*5)*d*(0.7+outN*0.5);
+    sctx.fillStyle="rgba("+hc+","+b.toFixed(3)+")";
+    sctx.fillRect(x-sz/2,y-sz/2,sz,sz);
+  }
+  // containment ring
+  sctx.strokeStyle="rgba(232,228,216,"+(dead?0.08:0.18)+")"; sctx.lineWidth=1.5;
+  sctx.beginPath(); sctx.arc(cx,cy,R,0,Math.PI*2); sctx.stroke();
+
+  // core glow: pulses with output, shudders when unstable
+  var pj=(Math.random()-0.5)*jit*6*d;
+  var pr=R*0.34*(0.85+0.15*Math.sin(coreP))*(dead?0.55:1);
+  var g=sctx.createRadialGradient(cx+pj,cy+pj,1,cx+pj,cy+pj,pr);
+  g.addColorStop(0,"rgba("+hc+","+(dead?0.25:0.55+outN*0.4)+")");
+  g.addColorStop(1,"rgba("+hc+",0)");
+  sctx.fillStyle=g;
+  sctx.beginPath(); sctx.arc(cx+pj,cy+pj,pr,0,Math.PI*2); sctx.fill();
+
+  // scram: white-red flash wash
+  if (scramFlash>0){
+    sctx.fillStyle="rgba(255,90,42,"+(scramFlash*0.22)+")";
+    sctx.fillRect(0,0,W,H);
+  }
+
+  // station tabs on top
   ORDER.forEach(function(s){
     var n=NODES[s], hot=S.pick===s;
     sctx.fillStyle="#0a0a0c"; sctx.fillRect(n.x,n.y,n.w,n.h);
@@ -222,22 +290,17 @@ function renderSchem(){
     sctx.fillStyle="#e8e4d8"; sctx.font=(10*d)+"px monospace";
     sctx.fillText(LIB[s][S.fit[s]].n, n.x+5*d, n.y+n.h-7*d);
   });
-  // live test trace overlays the middle
-  if (S.testing){
-    var T=S.testing;
+
+  // live test trace along the bottom
+  if (T){
     sctx.strokeStyle=T.fault?"#ff5a2a":"#d8ff3d"; sctx.lineWidth=2;
     sctx.beginPath();
     T.trace.forEach(function(v,i){
-      var x=W*0.06+ (W*0.88)*(i/(T.dur*30));
-      var y=H*0.60 - v*H*0.28;
+      var x=W*0.06+(W*0.88)*(i/(T.dur*30));
+      var y=H*0.96 - v*H*0.16;
       i?sctx.lineTo(x,y):sctx.moveTo(x,y);
     });
     sctx.stroke();
-  }
-  function link(a,b,c){
-    var A=NODES[a],B=NODES[b];
-    sctx.strokeStyle=c; sctx.lineWidth=2.5;
-    sctx.beginPath(); sctx.moveTo(A.x+A.w/2,A.y+A.h/2); sctx.lineTo(B.x+B.w/2,B.y+B.h/2); sctx.stroke();
   }
 }
 
@@ -358,12 +421,13 @@ function stepTest(dt){
   }
 }
 
-/* ============ loop ============ */
-function renderAll(){ renderGauges(); renderSchem(); renderDeck(); }
+/* ============ loop: the reactor is always alive ============ */
+function renderAll(){ renderGauges(); renderDeck(); }
 var last=performance.now();
 function loop(now){
   var dt=Math.min(0.1,(now-last)/1000); last=now;
-  if (S.testing){ stepTest(dt); renderSchem(); renderDeck(); if(Math.random()<0.3)renderGauges(); }
+  if (S.testing){ stepTest(dt); renderDeck(); if(Math.random()<0.3)renderGauges(); }
+  renderReactor(dt);
   requestAnimationFrame(loop);
 }
 window.addEventListener("resize",function(){ fit(); renderAll(); });
