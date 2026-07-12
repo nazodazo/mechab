@@ -313,7 +313,9 @@ function renderDeck(){
   document.getElementById("stats").innerHTML=st.map(function(s){
     return '<div class="stat'+(s[2]?" low":"")+'"><div class="k">'+s[0]+'</div><div class="v">'+s[1]+'</div></div>';
   }).join("");
-  document.getElementById("btnspin").disabled=S.tests<=0||!!S.testing;
+  var bs=document.getElementById("btnspin");
+  bs.textContent = S.testing ? "■ SCRAM" : "▸ SPIN UP";
+  bs.disabled = !S.testing && S.tests<=0;
 }
 function msg(html){ document.getElementById("msg").innerHTML=html; }
 
@@ -378,47 +380,104 @@ var opEl=document.getElementById("op");
 opEl.addEventListener("input",function(){
   S.op=+opEl.value/100;
   document.getElementById("opv").textContent=opEl.value+"%";
+  if (S.testing) S.testing.touched=true;     // hand-riding forfeits the clean-burn bonus
   renderAll();
 });
 
-/* ============ spin up: a 5s micro-warclock over this one machine ============ */
+/* ============ orders: the bench has a customer ============ */
+var ORDER_TAGS=["LANCE 2 REFIT","CAS TENDER","SIEGE MECHA","RECON FRAME","GARRISON PLANT"];
+function newOrder(){
+  S.order={ tag:ORDER_TAGS[(Math.random()*ORDER_TAGS.length)|0],
+            out:+(5+Math.random()*4).toFixed(1),
+            margin:+(1+Math.random()*2).toFixed(1) };
+  renderDeck();
+}
+function orderLine(){
+  return "ORDER <b>"+S.order.tag+"</b> — needs OUT ≥ "+S.order.out+" · MARGIN ≥ "+S.order.margin
+    +"\nburn in and hold spec at final load. reward: parts + test articles.";
+}
+
+/* ============ burn-in: dial stays LIVE, transients are foreseeable ============ */
 document.getElementById("btnspin").addEventListener("click",function(){
-  if (S.tests<=0||S.testing) return;
+  if (S.testing){                                   // manual scram — save the hardware
+    S.testing.manual=true; S.testing.fault={row:1,at:"DIRECTOR",why:"manual scram"};
+    return;
+  }
+  if (S.tests<=0) return;
   S.tests--;
-  S.testing={ t:0, dur:5, trace:[], fault:null };
-  msg("SPIN UP — ramping to "+((S.op*100)|0)+"% …");
+  // transients scheduled up front; a thin envelope makes them bite harder
+  S.testing={ t:0, dur:6, trace:[], fault:null, touched:false, pen:0,
+              events:[1.5+Math.random()*2, 3.5+Math.random()*1.8] };
+  msg("SPIN UP — ramping to "+((S.op*100)|0)+"% … dial is live.");
+  renderDeck();
 });
 function stepTest(dt){
   var T=S.testing; T.t+=dt;
-  var ramp=Math.min(1,T.t/(T.dur*0.55));
-  var load=S.op*ramp;
+  var ramp=Math.min(1,T.t/(T.dur*0.45));
+  var load=S.op*ramp;                               // S.op live — riding the dial works
   var m=metrics(load);
-  var noise=(Math.random()-0.5)*0.7 + (Math.random()<0.04?(Math.random()-0.5)*2.4:0); // fat tail
-  var mNow={ out:m.out, margin:m.margin+noise, stab:m.stab+noise*0.25 };
-  T.trace.push(Math.max(0,Math.min(1,mNow.out/14 + (Math.random()-0.5)*0.03)));
+  // transient events: margin dips you can see coming from a thin THERMAL band
+  if (T.events.length && T.t>=T.events[0]){
+    T.events.shift();
+    T.pen = m.margin<3 ? 2.4 : 1.1;
+    msg("<b class='rq'>TRANSIENT</b> — coolant cavitation, margin dipping. ride the dial or trust it.");
+  }
+  if (T.pen>0) T.pen=Math.max(0,T.pen-dt*1.4);
+  var noise=(Math.random()-0.5)*0.6 + (Math.random()<0.04?(Math.random()-0.5)*2.2:0);
+  var mNow={ out:m.out, margin:m.margin-T.pen+noise, stab:m.stab+noise*0.25 };
+  T.trace.push(Math.max(0,Math.min(1,mNow.out/14+(Math.random()-0.5)*0.03)));
   if (!T.fault && T.t>0.6){
     if (mNow.margin<0) T.fault={row:1, at:"EXCHANGER", why:"thermal runaway"};
     else if (mNow.stab<0.02) T.fault={row:2, at:"GOVERNOR", why:"oscillation divergence"};
   }
-  if (T.fault && T.t<T.dur) T.dur=Math.min(T.dur,T.t+0.7);   // scram cuts the run short
+  if (T.fault && T.t<T.dur) T.dur=Math.min(T.dur,T.t+0.7);
   if (T.t>=T.dur){
     var p=parts();
-    if (T.fault){
-      msg("<b class='bad'>SCRAM</b> @ "+T.fault.at+" — "+T.fault.why
-        +".\nfailed at "+((S.op*100)|0)+"% load. derate or refit.");
+    if (T.fault && !T.manual){
+      burnout();
+      msg("<b class='bad'>SCRAM</b> @ "+T.fault.at+" — "+T.fault.why+".\nfailed at "
+        +((S.op*100)|0)+"% load. hardware burned.");
       renderGauges(T.fault);
+    } else if (T.manual){
+      msg("manual scram — article spent, hardware safe. derate or refit, then retry.");
     } else {
       var mm=metrics(S.op);
-      var rating=(mm.out*(1+mm.stab)).toFixed(1);
-      if (!S.best || +rating>+S.best) S.best=rating;
-      var disc="";
+      var clean=!T.touched;
+      var rating=+(mm.out*(1+mm.stab)*(clean?1.1:1)).toFixed(1);
+      if (!S.best || rating>+S.best) S.best=rating;
+      var lines=["<b class='up'>BURN-IN PASSED</b> at "+((S.op*100)|0)+"%. rating <b>"+rating+"</b>"
+        +(clean?" <b class='up'>· CLEAN BURN ×1.1</b>":" (hand-ridden)")];
       if (resonant(p) && !S.found.res){ S.found.res=true;
-        disc="\n<b class='rq'>◈ HARMONIC LOCK — pulse feed rings clean in the cryo loop. logged.</b>"; }
-      msg("<b class='up'>TEST PASSED</b> — steady at "+((S.op*100)|0)+"%. rating <b>"+rating+"</b>"
-        +" (out "+mm.out.toFixed(1)+" · margin "+mm.margin.toFixed(1)+" · stab "+mm.stab.toFixed(2)+")"+disc);
+        lines.push("<b class='rq'>◈ HARMONIC LOCK — pulse feed rings clean in the cryo loop. logged.</b>"); }
+      if (mm.out>=S.order.out && mm.margin>=S.order.margin){
+        S.tests+=2; grantPart();
+        lines.push("<b class='up'>◈ ORDER "+S.order.tag+" DELIVERED</b> — +2 articles, +1 part.");
+        newOrder(); lines.push(orderLine());
+      } else {
+        lines.push("spec not met ("+S.order.tag+" needs OUT ≥ "+S.order.out+" · MARGIN ≥ "+S.order.margin+").");
+      }
+      msg(lines.join("\n"));
     }
-    S.testing=null;
+    S.testing=null; renderDeck();
   }
+}
+/* a real fault costs hardware: one owned part burns */
+function burnout(){
+  var pool=[];
+  ORDER.forEach(function(s){ LIB[s].forEach(function(c,k){
+    if ((STOCK[stockKey(s,k)]||0)>0 && !(s==="CORE"&&k===0)) pool.push([s,k]);  // never burn the last salvage core path
+  }); });
+  if (!pool.length) return;
+  var b=pool[(Math.random()*pool.length)|0];
+  STOCK[stockKey(b[0],b[1])]--;
+  if (S.fit[b[0]]===b[1] && (STOCK[stockKey(b[0],b[1])]||0)===0) S.fit[b[0]]=0;
+  msg("<b class='bad'>burnout: "+LIB[b[0]][b[1]].n+" destroyed.</b>");
+}
+function grantPart(){
+  var pool=[];
+  ORDER.forEach(function(s){ LIB[s].forEach(function(c,k){ pool.push([s,k]); }); });
+  var g=pool[(Math.random()*pool.length)|0];
+  STOCK[stockKey(g[0],g[1])]=(STOCK[stockKey(g[0],g[1])]||0)+1;
 }
 
 /* ============ loop: the reactor is always alive ============ */
@@ -431,7 +490,8 @@ function loop(now){
   requestAnimationFrame(loop);
 }
 window.addEventListener("resize",function(){ fit(); renderAll(); });
-initStock(); fit(); renderAll(); requestAnimationFrame(loop);
+initStock(); newOrder(); fit(); renderAll(); requestAnimationFrame(loop);
+msg(orderLine());
 </script>
 </body>
 </html>

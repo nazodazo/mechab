@@ -33,6 +33,9 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 #bclock{color:var(--ink);font-variant-numeric:tabular-nums}
 #phase{flex:1;text-align:center;overflow:hidden;white-space:nowrap}
 #tidepct{font-variant-numeric:tabular-nums}
+#btnpause{background:transparent;border:1px solid var(--line);color:var(--ink);
+  font-family:var(--mono);font-size:11px;padding:2px 10px;touch-action:manipulation}
+#btnpause.on{border-color:var(--amber);color:var(--amber)}
 
 #mapwrap{height:30%;flex:none;padding:6px}
 #map{width:100%;height:100%;display:block;image-rendering:pixelated;touch-action:none}
@@ -89,7 +92,8 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 </head>
 <body>
 <main id="device">
-  <div id="topbar"><span id="bclock">90.0</span><span id="phase">THEATRE 7 // LIVE</span><span id="tidepct">—</span></div>
+  <div id="topbar"><span id="bclock">90.0</span><span id="phase">THEATRE 7 // LIVE</span>
+    <button id="btnpause">⏸</button><span id="tidepct">—</span></div>
   <div id="mapwrap" class="panel"><span class="ph">THEATRE</span><canvas id="map"></canvas></div>
   <div id="trendwrap" class="panel"><span class="ph">TIDE</span><canvas id="trend"></canvas></div>
   <section id="info" class="panel"><span class="ph">TELEMETRY</span>
@@ -129,7 +133,9 @@ function reset(){
     terr:new Uint8Array(GW*GH),       // 1 = impassable terrain (chokepoint maker)
     glyph:{},                         // i -> {ch, until, color}
     troops:1200, mecha:3, cas:4, req:400,
-    warn:null, hang:null,             // enemy play lifecycle: warn -> hang -> resolve
+    warn:null, hang:null,             // enemy play lifecycle: buildup -> hang -> resolve
+    standby:null,                     // pre-positioned assist: {i, cmd, base}
+    paused:false,
     sel:-1, tide:0, hist:[], marks:[],
     mode:"root", pending:null, target:-1,
     receipts:[], nextPlay: 5+Math.random()*3, lastTick:0, mom:0,
@@ -201,16 +207,33 @@ function openWarn(){
   f.sort(function(a,b){ return choky(b)-choky(a); });         // enemy hits chokepoints
   var i=f[(Math.random()*Math.min(4,f.length))|0];
   var p=PLAYS[(Math.random()*PLAYS.length)|0];
-  S.warn={ i:i, play:p, opens:2.2, cs:CALLSIGNS[(Math.random()*CALLSIGNS.length)|0] };
-  setGlyph(i,"?","#ffb63d",2.2);
-  logf(S.warn.cs+": movement near "+sname(i)+" — stand by.","rq");
+  // BUILDUP, not pop-up: 8-12s of visible massing before the contest opens.
+  // A map-reader sees it coming; the radio is only the first hint.
+  S.warn={ i:i, play:p, opens:8+Math.random()*4, tick:0,
+           cs:CALLSIGNS[(Math.random()*CALLSIGNS.length)|0] };
+  setGlyph(i,"?","#ffb63d",S.warn.opens);
+  logf(S.warn.cs+": movement massing near "+sname(i)+".","rq");
 }
 function openHang(){
   var w=S.warn; S.warn=null;
   var dur=4+Math.random()*1.5;
-  S.hang={ i:w.i, play:w.play, dur:dur, left:dur, committed:0, used:null, cs:w.cs };
+  // the radio CALLS an assist — but it's a request, not the answer key (~25% wrong)
+  var req=w.play.counter;
+  if (Math.random()<0.25){
+    var alts=["CAS","COMMIT","MECHA"].filter(function(c){return c!==req;});
+    req=alts[(Math.random()*alts.length)|0];
+  }
+  S.hang={ i:w.i, play:w.play, dur:dur, left:dur, committed:0, used:null, cs:w.cs, req:req };
   setGlyph(w.i,"X","#ff5a2a",dur);
-  logf("◈ "+w.play.name+" @ "+sname(w.i)+" — "+w.cs+" "+w.play.call,"rq");
+  logf("◈ "+w.play.name+" @ "+sname(w.i)+" — "+w.cs+" requests "+req,"rq");
+  // a pre-positioned standby on (or beside) the cell pays off at full strength
+  if (S.standby && Math.max(Math.abs(S.standby.i%GW - w.i%GW), Math.abs(((S.standby.i/GW)|0)-((w.i/GW)|0)))<=1){
+    S.hang.committed += S.standby.base*1.5;
+    S.hang.used = S.standby.cmd;
+    logf("▸ standby "+S.standby.cmd+" engages — pre-positioned.","up");
+    S.receipts.push("▸ STANDBY "+S.standby.cmd+" @ "+sname(S.standby.i)+" — <b>anticipated the play</b> (×1.5)");
+    S.standby=null;
+  }
 }
 function resolveHang(){
   var h=S.hang; S.hang=null; S.nextPlay=6+Math.random()*5;
@@ -219,8 +242,9 @@ function resolveHang(){
     var right = h.used===h.play.counter;
     d=(0.35+h.committed)*(right?1.7:0.8)*fat();
     out = right?"COUNTERED":"BLUNTED";
+    var radioNote = h.req!==h.play.counter?" — radio called "+h.req+", truth was "+h.play.counter:"";
     S.receipts.push("◈ "+h.play.name+" @ "+sname(h.i)+" — <b>"+out+"</b> with "+h.used
-      +(right?" (correct assist)":" (wrong assist — "+h.play.counter+" was called)"));
+      +(right?" (correct assist)":" (wrong assist — "+h.play.counter+" answers "+h.play.name+")")+radioNote);
   } else {
     // no intervention: the build fights its own battle. Not adversarial — but plays probe it.
     if (Math.random() < 0.55+PRESSURE){ d=0.18*fat(); out="HELD BY DOCTRINE";
@@ -236,12 +260,18 @@ function resolveHang(){
 
 /* ============ warclock ============ */
 function advance(dt){
-  if (S.over) return;
+  if (S.over || S.paused) return;
   S.t-=dt; S.lastTick+=dt;
   S.req+=dt*captured()*0.4;
   if (S.lastTick>=0.6){ S.lastTick=0; microTick(); }
 
-  if (S.warn){ S.warn.opens-=dt; if (S.warn.opens<=0) openHang(); }
+  if (S.warn){
+    S.warn.opens-=dt; S.warn.tick+=dt;
+    if (S.warn.tick>=1.2){ S.warn.tick=0;          // visible massing: pressure leaks in
+      clampCell(S.warn.i,-0.06); bleed(S.warn.i,-0.03);
+      setGlyph(S.warn.i,"?","#ffb63d",S.warn.opens); }
+    if (S.warn.opens<=0) openHang();
+  }
   else if (S.hang){ S.hang.left-=dt; if (S.hang.left<=0) resolveHang(); }
   else { S.nextPlay-=dt; if (S.nextPlay<=0) openWarn(); }
 
@@ -290,13 +320,17 @@ var CMDS=[
 ];
 function assist(i,base,tag){
   var inHang = S.hang && S.hang.i===i;
-  var lev = inHang ? (0.4+(S.hang.left/S.hang.dur)*0.6) : 0.5;
-  var eff = base*lev;
-  if (inHang){ S.hang.committed+=eff; S.hang.used=tag; }
-  else { clampCell(i,eff*fat()); bleed(i,eff*0.4); mark(tag,true); }
-  setGlyph(i,"+","#d8ff3d",2.5);
-  logf("▸ "+tag+" @ "+sname(i)+(inHang?" — into the contest":""),"up");
-  if (!inHang) S.receipts.push("▸ "+tag+" @ "+sname(i)+" (open ground) at "+(90-S.t).toFixed(0)+"s");
+  if (inHang){                                   // late response: leverage decays
+    var lev = 0.4+(S.hang.left/S.hang.dur)*0.6;
+    S.hang.committed+=base*lev; S.hang.used=tag;
+    setGlyph(i,"+","#d8ff3d",2.5);
+    logf("▸ "+tag+" @ "+sname(i)+" — into the contest (late)","up");
+  } else {                                       // anticipation: place a standby
+    if (S.standby) logf("standby "+S.standby.cmd+" @ "+sname(S.standby.i)+" recalled.","sys");
+    S.standby={ i:i, cmd:tag, base:base };
+    setGlyph(i,"+","#d8ff3d",99);
+    logf("▸ "+tag+" on STANDBY @ "+sname(i)+" — waiting for the play.","up");
+  }
 }
 
 /* ============ render: heatmap ============ */
@@ -412,7 +446,7 @@ function renderOptions(){
   var list=document.getElementById("optlist"), foot=document.getElementById("footer");
   if (S.mode==="root"){
     foot.classList.remove("on");
-    var rec=S.hang?S.hang.play.counter:null;
+    var rec=S.hang?S.hang.req:null;    // what the radio ASKED for — not always right
     list.innerHTML=CMDS.map(function(c,k){
       var isRec=rec===c.id;
       return '<button class="opt'+(isRec?" rec":"")+'" data-k="'+k+'"'+(c.can()?"":" disabled")+'>'
@@ -449,6 +483,12 @@ mapC.addEventListener("pointerdown",function(e){
 document.getElementById("again").addEventListener("click",function(){
   document.getElementById("debrief").classList.remove("on");
   feedLines=[]; reset(); renderOptions();
+});
+document.getElementById("btnpause").addEventListener("click",function(){
+  S.paused=!S.paused;
+  this.textContent=S.paused?"▶":"⏸";
+  this.classList.toggle("on",S.paused);
+  document.getElementById("phase").textContent=S.paused?"THEATRE 7 // PAUSED":"THEATRE 7 // LIVE";
 });
 
 /* ============ loop ============ */
