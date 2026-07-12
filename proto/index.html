@@ -147,13 +147,16 @@ function genTerrain(){
    ~6k random cells per tick keeps it organic and cheap (typed arrays). */
 function caStep(){
   var A=S.aggression;
-  for (var k=0;k<6000;k++){
+  for (var k=0;k<4000;k++){
     var i=(Math.random()*N)|0; if (S.terr[i]) continue;
     var x=i%GW, y=(i/GW)|0;
     var l=x>0&&!S.terr[i-1]?S.c[i-1]:S.c[i], r=x<GW-1&&!S.terr[i+1]?S.c[i+1]:S.c[i];
     var u=y>0&&!S.terr[i-GW]?S.c[i-GW]:S.c[i], d=y<GH-1&&!S.terr[i+GW]?S.c[i+GW]:S.c[i];
     var avg=(l+r+u+d)/4;
-    var v=S.c[i] + 0.22*(avg-S.c[i]) + (Math.random()-0.5)*0.02 - A;
+    var v=S.c[i] + 0.13*(avg-S.c[i]) + (Math.random()-0.5)*0.014 - A;
+    // attrition: advancing into the middle costs — fronts stall into a line
+    // instead of flooding across (contested band stays contested)
+    if (Math.abs(v)<0.55) v-=v*0.05;
     if (x<3) v=Math.max(v,0.9); if (x>=GW-3) v=Math.min(v,-0.9);   // supply at the edges
     S.c[i]=v>1?1:v<-1?-1:v;
   }
@@ -204,9 +207,9 @@ function teamTick(dt){
   }
   if (T.phase==="WORK"){
     T.prog += dt*(T.urge?11:6.5)*T.morale;
-    T.heat += dt*(T.urge?2.6:1.1) * (1+localHostility(T)*1.6);
+    T.heat += dt*(T.urge?1.4:0.55) * (1+localHostility(T)*0.8);
     if (!S.cue && Math.random()<dt*0.35) raiseRequest();
-    if (T.heat>7 && Math.random()<dt*0.5) teamHit("taking fire on the objective");
+    if (T.heat>10 && Math.random()<dt*0.18) teamHit("taking fire on the objective");
     if (T.prog>=100){
       var bi=T.obj.b, cx2=T.obj.x*BW+BW/2, cy2=T.obj.y*BW+BW/2;
       blast(cx2,cy2,14,0.9);
@@ -245,7 +248,7 @@ function blast(cx,cy,rad,amt){
     }
 }
 function teamHit(why){
-  S.team.hp--; S.team.heat=Math.max(0,S.team.heat-3);
+  S.team.hp--; S.team.heat=Math.max(0,S.team.heat-6);
   cue("141: man down — "+why+".","bad");
   S.receipts.push("▼ 141 casualty — "+why);
   if (S.team.hp<=0){ S.team.phase="DOWN"; S.team.pt=20; S.team.morale=Math.max(0.5,S.team.morale-0.2);
@@ -277,8 +280,9 @@ function raiseRequest(){
 function advance(dt){
   if (S.over||S.paused) return;
   S.t-=dt;
-  S.aggression=0.0016+ (1-S.t/240)*0.0022;          // theatre presses harder late
-  caStep();
+  S.aggression=0.0008+ (1-S.t/240)*0.0016;          // theatre presses harder late
+  S.caTimer=(S.caTimer||0)+dt;                      // CA runs on its own cadence,
+  if (S.caTimer>=0.12){ S.caTimer-=0.12; caStep(); }// NOT per frame — 60x/s was a flood
   S.hotTimer+=dt; if (S.hotTimer>0.6){ S.hotTimer=0; findHotspots(); }
   teamTick(dt);
   if (S.cue){ S.cue.left-=dt;
