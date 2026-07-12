@@ -3,10 +3,11 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
-<title>WARCLOCK // proto v3</title>
+<title>WARCLOCK // proto v4</title>
 <style>
-/* v3 — two clocks: the theatre grinds on its own; an operative team works
-   inside it. You are neither. You are the one they call. */
+/* v4 — an agent-driven war. Squads on BOTH sides push the front; the player
+   is responsible for exactly one of them. Ops derive from the ground they
+   target (DA / SR / UW / terminal guidance, per SOF doctrine). */
 :root{
   --bg:#17171b; --panel:#1e1e24; --ink:#e8e4d8; --dim:#8a8778; --line:#34343c;
   --us:#d8ff3d; --foe:#ff5a2a; --amber:#ffb63d;
@@ -33,34 +34,47 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 #btnpause.on{border-color:var(--amber);color:var(--amber)}
 #tidepct{font-variant-numeric:tabular-nums}
 
-#mapwrap{height:34%;flex:none;padding:6px}
+#mapwrap{height:33%;flex:none;padding:6px}
 #map{width:100%;height:100%;display:block;image-rendering:pixelated;touch-action:none}
-#trendwrap{height:10%;flex:none;padding:5px 6px}
+#trendwrap{height:9%;flex:none;padding:5px 6px}
 #trend{width:100%;height:100%;display:block}
 
-/* bottom: stats LEFT, cues CENTER, buttons under */
+/* the ticker: the war narrates itself in one scrolling line */
+#ticker{flex:none;border:1px solid var(--line);background:var(--bg);
+  overflow:hidden;height:22px;position:relative}
+#tickin{position:absolute;left:0;top:0;white-space:nowrap;line-height:22px;font-size:11px;
+  will-change:transform;animation:tk 16s linear infinite;padding-left:100%}
+@keyframes tk{to{transform:translateX(-100%)}}
+#tickin .up{color:var(--us)} #tickin .bad{color:var(--foe)} #tickin .rq{color:var(--amber)}
+#tickin .sep{color:var(--line);padding:0 8px}
+
 #deck{flex:1;padding:10px 8px 8px;display:flex;flex-direction:column;gap:6px;overflow:hidden}
+#reqbar{border:1px solid var(--amber);padding:4px 8px;display:none;flex:none}
+#reqbar.on{display:block}
+#reqbar .t{color:var(--amber);font-size:11px}
+#reqwin{height:5px;background:var(--bg);margin-top:3px}
+#reqwin i{display:block;height:100%;background:var(--amber);width:100%}
 #deckmain{flex:1;display:flex;gap:8px;min-height:0}
-#stats{width:31%;flex:none;display:flex;flex-direction:column;gap:4px}
+#stats{width:30%;flex:none;display:flex;flex-direction:column;gap:4px}
 .stat{border:1px solid var(--line);padding:3px 7px;background:var(--bg);
   display:flex;justify-content:space-between;align-items:baseline}
 .stat .k{color:var(--dim);font-size:9px;letter-spacing:.1em}
 .stat .v{font-size:13px;font-variant-numeric:tabular-nums}
 .stat.low .v{color:var(--foe)}
-#cues{flex:1;display:flex;flex-direction:column;gap:3px;overflow:hidden;font-size:11px}
-#cues .cue{color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#cues .cue.team{color:var(--ink)}
-#cues .cue.req{color:var(--amber)}
-#cues .cue.up{color:var(--us)} #cues .cue.bad{color:var(--foe)}
-#reqbar{border:1px solid var(--amber);padding:4px 8px;display:none;flex:none}
-#reqbar.on{display:block}
-#reqbar .t{color:var(--amber);font-size:11px}
-#reqwin{height:5px;background:var(--panel);margin-top:3px}
-#reqwin i{display:block;height:100%;background:var(--amber);width:100%}
+/* squad board: every allied team, live */
+#squads{flex:1;display:flex;flex-direction:column;gap:4px;min-width:0}
+.sq{border:1px solid var(--line);background:var(--bg);padding:3px 7px;
+  display:grid;grid-template-columns:52px 1fr auto;gap:6px;align-items:baseline}
+.sq.mine{border-color:var(--us)}
+.sq .nm{font-size:11px;letter-spacing:.06em}
+.sq.mine .nm{color:var(--us)}
+.sq .st{font-size:10px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sq .hp{font-size:10px;letter-spacing:.1em}
+.sq .hp b{color:var(--us);font-weight:400} .sq .hp span{color:var(--line)}
+#hostiles{font-size:10px;color:var(--foe);letter-spacing:.06em;padding:1px 2px}
 
-/* one-press arms, second press fires. layout never changes. */
 #actions{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;flex:none}
-#actions button{padding:12px 4px;font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;
+#actions button{padding:12px 4px;font-family:var(--mono);font-size:11.5px;letter-spacing:.04em;
   background:var(--bg);border:1px solid var(--line);color:var(--ink);
   touch-action:manipulation;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #actions button:active{background:var(--ink);color:var(--bg)}
@@ -69,7 +83,7 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 #actions button.hot{border-color:var(--amber);color:var(--amber)}
 #actions button.togon{border-color:var(--us);color:var(--us)}
 
-#debrief{position:absolute;inset:0;background:rgba(10,10,12,.97);display:none;
+#debrief{position:absolute;inset:0;background:rgba(23,23,27,.97);display:none;
   flex-direction:column;padding:40px 24px;gap:10px;z-index:5}
 #debrief.on{display:flex}
 #debrief h2{font-size:18px;font-weight:400;letter-spacing:.1em}
@@ -82,14 +96,15 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 <body>
 <main id="device">
   <div id="topbar"><span id="bclock">240</span><span id="phase">THEATRE 7 // LIVE</span>
-    <button id="btnpause">⏸</button><span id="tidepct">—</span></div>
-  <div id="mapwrap" class="panel"><span class="ph">THEATRE — tap to designate the team's next objective</span><canvas id="map"></canvas></div>
+    <button id="btnpause">⏸</button><span id="tidepct">TIDE —</span></div>
+  <div id="mapwrap" class="panel"><span class="ph">THEATRE — tap to designate 141's objective</span><canvas id="map"></canvas></div>
   <div id="trendwrap" class="panel"><span class="ph">TIDE</span><canvas id="trend"></canvas></div>
+  <div id="ticker"><div id="tickin"></div></div>
   <section id="deck" class="panel"><span class="ph">OPERATIONS</span>
     <div id="reqbar"><span class="t" id="reqtxt"></span><div id="reqwin"><i></i></div></div>
     <div id="deckmain">
       <div id="stats"></div>
-      <div id="cues"></div>
+      <div id="squads"></div>
     </div>
     <div id="actions">
       <button id="b0"></button><button id="b1"></button><button id="b2"></button><button id="b3"></button>
@@ -100,8 +115,9 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 
 <script>
 "use strict";
-/* ================= fine-grain front: typed arrays + ImageData ================= */
-var GW=192, GH=88, N=GW*GH;
+/* ================= front: ~10k cells ================= */
+var GW=128, GH=80, N=GW*GH;                      // 10,240 cells
+var BW=8, BX=GW/BW, BY=GH/BW;
 var mapC=document.getElementById("map"), mctx=mapC.getContext("2d");
 var trC=document.getElementById("trend"), tctx=trC.getContext("2d");
 var buf=document.createElement("canvas"); buf.width=GW; buf.height=GH;
@@ -112,28 +128,38 @@ function fit(c){ var r=c.getBoundingClientRect(),d=window.devicePixelRatio||1;
 
 var S;
 function reset(){
-  S={ t:240, over:false, paused:false,
+  S={ t:240, over:false, paused:false, caTimer:0,
       c:new Float32Array(N), terr:new Uint8Array(N),
-      req:300, cas:3, aggression:0.0016,
+      req:300, cas:3, mat:0,
       tide:0, hist:[], marks:[], receipts:[],
-      hotspots:[], hotTimer:0,
-      designated:-1,                        // block index the player tapped
-      team:{ hp:4, morale:1, phase:"STAGING", pt:4, x:4, y:GH/2, obj:null, prog:0, heat:0, urge:false },
-      cue:null,                             // active request {label,act,left,dur}
-      arm:[0,0,0,0],                        // per-button confirm timers
+      hotspots:[], hotTimer:0, designated:-1,
+      cue:null, arm:[0,0,0,0],
+      squads:[
+        mkSquad("141",  1, true),
+        mkSquad("BULL-6",1, false),
+        mkSquad("RAZOR-2",1,false),
+        mkSquad("KESSEL",-1,false),
+        mkSquad("HARROW",-1,false),
+      ],
   };
   genTerrain();
   for (var y=0;y<GH;y++) for (var x=0;x<GW;x++){
     var i=y*GW+x; if (S.terr[i]) continue;
-    S.c[i] = x<5 ? 0.95 : x>=GW-5 ? -0.95 : 0;     // forces start at the edges
+    S.c[i] = x<4 ? 0.95 : x>=GW-4 ? -0.95 : 0;
   }
-  cues.length=0;
-  cue("THEATRE 7 OPEN — forces deploying from the lines.","team");
-  cue("141 staging. tap the map to designate their objective.","req");
+  ticks.length=0;
+  tick("THEATRE 7 OPEN — squads deploying on both sides","up");
+  tick("141 is yours. tap the map to designate their objective","rq");
+}
+function mkSquad(name,side,player){
+  return { name:name, side:side, player:player, hp:4, morale:1,
+           phase:"STAGING", pt:2+Math.random()*4,
+           x: side>0?4:GW-4, y: GH*(0.25+Math.random()*0.5),
+           obj:null, op:null, prog:0, heat:0, urge:false };
 }
 function genTerrain(){
-  for (var r=0;r<5;r++){
-    var x=(GW*0.25+Math.random()*GW*0.5)|0, y=(Math.random()*GH)|0, len=14+(Math.random()*30|0);
+  for (var r=0;r<4;r++){
+    var x=(GW*0.25+Math.random()*GW*0.5)|0, y=(Math.random()*GH)|0, len=10+(Math.random()*22|0);
     for (var s2=0;s2<len;s2++){
       for (var dy=-1;dy<=1;dy++){ var yy=y+dy;
         if (x>=0&&x<GW&&yy>=0&&yy<GH) S.terr[yy*GW+x]=1; }
@@ -143,150 +169,190 @@ function genTerrain(){
   }
 }
 
-/* CA step: sampled relaxation + edge-fed expansion + adversarial bias.
-   ~6k random cells per tick keeps it organic and cheap (typed arrays). */
+/* CA: symmetric relaxation. NO global bias — the war moves because AGENTS
+   push it. attrition stalls unsupported advances into a front line. */
 function caStep(){
-  var A=S.aggression;
-  for (var k=0;k<4000;k++){
+  for (var k=0;k<2600;k++){
     var i=(Math.random()*N)|0; if (S.terr[i]) continue;
     var x=i%GW, y=(i/GW)|0;
     var l=x>0&&!S.terr[i-1]?S.c[i-1]:S.c[i], r=x<GW-1&&!S.terr[i+1]?S.c[i+1]:S.c[i];
     var u=y>0&&!S.terr[i-GW]?S.c[i-GW]:S.c[i], d=y<GH-1&&!S.terr[i+GW]?S.c[i+GW]:S.c[i];
     var avg=(l+r+u+d)/4;
-    var v=S.c[i] + 0.13*(avg-S.c[i]) + (Math.random()-0.5)*0.014 - A;
-    // attrition: advancing into the middle costs — fronts stall into a line
-    // instead of flooding across (contested band stays contested)
+    var v=S.c[i] + 0.13*(avg-S.c[i]) + (Math.random()-0.5)*0.014;
     if (Math.abs(v)<0.55) v-=v*0.05;
-    if (x<3) v=Math.max(v,0.9); if (x>=GW-3) v=Math.min(v,-0.9);   // supply at the edges
+    if (x<3) v=Math.max(v,0.9); if (x>=GW-3) v=Math.min(v,-0.9);
     S.c[i]=v>1?1:v<-1?-1:v;
   }
 }
-/* hotspots: 8x8 blocks; only a block that clots into a real mass gets a mark.
-   scattered pixels imply nothing — that's the point. */
-var BW=8, BX=GW/BW, BY=GH/BW;
 function findHotspots(){
   var hs=[];
   for (var by=0;by<BY;by++) for (var bx=0;bx<BX;bx++){
-    var cont=0, sum=0, n2=0;
+    var cont=0,sum=0,n2=0;
     for (var y=0;y<BW;y++) for (var x=0;x<BW;x++){
       var i=(by*BW+y)*GW+(bx*BW+x);
-      if (S.terr[i]) continue; n2++;
-      sum+=S.c[i];
+      if (S.terr[i]) continue; n2++; sum+=S.c[i];
       if (Math.abs(S.c[i])<0.35) cont++;
     }
     if (!n2) continue;
     var frac=cont/n2;
-    if (frac>0.55) hs.push({b:by*BX+bx, x:bx, y:by, frac:frac, mean:sum/n2});
+    if (frac>0.5) hs.push({b:by*BX+bx,x:bx,y:by,frac:frac,mean:sum/n2});
   }
   hs.sort(function(a,b){return b.frac-a.frac;});
   S.hotspots=hs.slice(0,6);
 }
 function tideCalc(){
   var g=0,n2=0;
-  for (var i=0;i<N;i+=7){ if (S.terr[i]) continue; g+=S.c[i]; n2++; }
+  for (var i=0;i<N;i+=5){ if (S.terr[i]) continue; g+=S.c[i]; n2++; }
   return g/n2;
-}
-
-/* ================= the team: their clock, not yours ================= */
-var T_NAMES=["GHOST","VIPER","SABLE","ONYX"];
-function teamTick(dt){
-  var T=S.team;
-  if (T.phase==="DOWN"){ T.pt-=dt; if (T.pt<=0){ T.phase="STAGING"; T.pt=4; T.hp=Math.min(4,T.hp+2);
-      cue("141 refit — restaged and ready.","team"); } return; }
-  if (T.phase==="STAGING"){ T.pt-=dt;
-    if (T.pt<=0){ T.obj=pickObjective(); if(!T.obj){T.pt=3;return;}
-      T.phase="INSERT"; cue("141 inserting toward "+bname(T.obj),"team"); } return; }
-  if (T.phase==="INSERT"){
-    var tx=T.obj.x*BW+BW/2, ty=T.obj.y*BW+BW/2;
-    var dx=tx-T.x, dy=ty-T.y, dist=Math.hypot(dx,dy);
-    if (dist<2){ T.phase="WORK"; T.prog=0; T.heat=0;
-      cue("141 on objective — going to work.","team"); return; }
-    var sp=(T.urge?9:6)*dt; T.x+=dx/dist*sp; T.y+=dy/dist*sp;
-    if (T.urge) T.heat+=dt*1.2;
-    return;
-  }
-  if (T.phase==="WORK"){
-    T.prog += dt*(T.urge?11:6.5)*T.morale;
-    T.heat += dt*(T.urge?1.4:0.55) * (1+localHostility(T)*0.8);
-    if (!S.cue && Math.random()<dt*0.35) raiseRequest();
-    if (T.heat>10 && Math.random()<dt*0.18) teamHit("taking fire on the objective");
-    if (T.prog>=100){
-      var bi=T.obj.b, cx2=T.obj.x*BW+BW/2, cy2=T.obj.y*BW+BW/2;
-      blast(cx2,cy2,14,0.9);
-      S.req+=120; mark("141",true);
-      S.receipts.push("◈ 141 objective "+bname(T.obj)+" — <b>EXECUTED</b>. front broken locally.");
-      cue("141: objective done. exfiltrating.","up");
-      S.cue=null; T.phase="EXFIL";
-    }
-    return;
-  }
-  if (T.phase==="EXFIL"){
-    var dx2=4-T.x, dy2=GH/2-T.y, d2=Math.hypot(dx2,dy2);
-    if (d2<3){ T.phase="STAGING"; T.pt=6; cue("141 home. restaging.","team"); return; }
-    T.x+=dx2/d2*7*dt; T.y+=dy2/d2*7*dt;
-  }
-}
-function pickObjective(){
-  if (S.designated>=0){
-    var bx=S.designated%BX, by=(S.designated/BX)|0;
-    var hs={b:S.designated,x:bx,y:by,frac:1};
-    S.designated=-1; return hs;
-  }
-  var deep=S.hotspots.filter(function(h){return h.mean<0.1;});
-  return deep[0]||S.hotspots[0]||null;
-}
-function localHostility(T){
-  var i=((T.y|0)*GW+(T.x|0)); if (i<0||i>=N) return 0;
-  return Math.max(0,-S.c[i]);
 }
 function blast(cx,cy,rad,amt){
   for (var y=Math.max(0,cy-rad|0);y<Math.min(GH,cy+rad);y++)
     for (var x=Math.max(0,cx-rad|0);x<Math.min(GW,cx+rad);x++){
       var dd=Math.hypot(x-cx,y-cy); if (dd>rad) continue;
       var i=y*GW+x; if (S.terr[i]) continue;
-      S.c[i]=Math.min(1,S.c[i]+amt*(1-dd/rad));
+      S.c[i]=Math.max(-1,Math.min(1,S.c[i]+amt*(1-dd/rad)));
     }
 }
-function teamHit(why){
-  S.team.hp--; S.team.heat=Math.max(0,S.team.heat-6);
-  cue("141: man down — "+why+".","bad");
-  S.receipts.push("▼ 141 casualty — "+why);
-  if (S.team.hp<=0){ S.team.phase="DOWN"; S.team.pt=20; S.team.morale=Math.max(0.5,S.team.morale-0.2);
-    S.cue=null; cue("141 COMBAT INEFFECTIVE — extraction under fire.","bad");
-    S.receipts.push("██ 141 wiped to extraction — 20s refit, morale down.");
+function bname(b){ return String.fromCharCode(65+b.y)+"-"+(b.x+1); }
+
+/* ============ ops: the ground dictates the mission (SOF doctrine) ============ */
+function opFor(sq,obj){
+  var m=obj.mean*sq.side;                    // from this squad's perspective
+  if (m<-0.3)  return {id:"DA", name:"SABOTAGE",  desc:"direct action deep in hostile ground"};
+  if (m>0.25)  return {id:"SR", name:"ESPIONAGE", desc:"special recon — harvest materiel"};
+  var chok=0; // near terrain? terminal guidance becomes possible
+  for (var y=0;y<BW;y++) for (var x=0;x<BW;x++){
+    var i=(obj.y*BW+y)*GW+(obj.x*BW+x); if (S.terr[i]) chok++;
+  }
+  if (chok>6)  return {id:"TG", name:"UPLINK",    desc:"terminal guidance — unlocks barrage"};
+  return       {id:"UW", name:"ASSAULT SPT",      desc:"force multiplier on the line"};
+}
+function opComplete(sq){
+  var o=sq.obj, cx=o.x*BW+BW/2, cy=o.y*BW+BW/2, side=sq.side;
+  if (!sq.player){ blast(cx,cy,7,side*0.5); return; }
+  switch (sq.op.id){
+    case "DA": blast(cx,cy,11,0.85); S.req+=100;
+      done(sq,"SABOTAGE executed — front broken","+100 req"); break;
+    case "SR": S.mat++; S.req+=150; blast(cx,cy,4,0.2);
+      done(sq,"ESPIONAGE haul secured","+1 MAT +150 req"); break;
+    case "TG": S.mat+=2; blast(cx,cy,5,0.3);
+      done(sq,"UPLINK established","+2 MAT — barrage armed"); break;
+    default:   blast(cx,cy,8,0.55); S.req+=60;
+      done(sq,"line assault carried","+60 req");
+  }
+  function done(sq2,msg,rw){
+    tick("141: "+msg+" ("+rw+")","up"); mark("141",true);
+    S.receipts.push("◈ 141 "+sq2.op.name+" @ "+bname(o)+" — <b>done</b>. "+rw);
   }
 }
-/* requests: the team asks; you answer (or don't). the window is theirs. */
-var REQS=[
-  {label:"APPROVE SABOTAGE", verb:"SABOTAGE", cost:"−80 req", can:function(){return S.req>=80;},
-   yes:function(){ S.req-=80; S.team.prog+=30; cue("141: charges set — progress jumped.","up"); },
-   no:function(){ cue("141: copy. doing it the slow way.","team"); }},
-  {label:"APPROVE RIG",      verb:"RIG",      cost:"−60 req", can:function(){return S.req>=60;},
-   yes:function(){ S.req-=60; S.team.heat=Math.max(0,S.team.heat-4); cue("141: decoys rigged — heat off.","up"); },
-   no:function(){ S.team.heat+=1.5; cue("141: negative copy. staying loud.","team"); }},
-  {label:"CAS DANGER-CLOSE", verb:"CAS",      cost:"−1 cas",  can:function(){return S.cas>0;},
-   yes:function(){ S.cas--; blast(S.team.x,S.team.y,9,0.5); S.team.heat=0; cue("CAS in — danger close, front pushed.","up"); },
-   no:function(){ cue("141: no air. breaking contact ourselves.","team"); S.team.prog=Math.max(0,S.team.prog-15); }},
-];
-function raiseRequest(){
-  var pool=REQS.filter(function(r){return r.can();});
+
+/* ============ squads: one lifecycle, both sides, you own one ============ */
+function squadTick(sq,dt){
+  if (sq.phase==="DOWN"){ sq.pt-=dt; if (sq.pt<=0){ sq.phase="STAGING"; sq.pt=4;
+      sq.hp=Math.min(4,sq.hp+2); if (sq.player) tick("141 refit — restaged","team"); } return; }
+  if (sq.phase==="STAGING"){ sq.pt-=dt;
+    if (sq.pt<=0){
+      sq.obj=pickObjective(sq); if (!sq.obj){ sq.pt=3; return; }
+      sq.op=opFor(sq,sq.obj);
+      sq.phase="INSERT";
+      if (sq.player) tick("141 inserting → "+bname(sq.obj)+" ["+sq.op.name+"]","team");
+      else if (sq.side>0) tick(sq.name+" moving on "+bname(sq.obj),"team");
+    } return; }
+  var tx=sq.obj.x*BW+BW/2, ty=sq.obj.y*BW+BW/2;
+  if (sq.phase==="INSERT"){
+    var dx=tx-sq.x, dy=ty-sq.y, dist=Math.hypot(dx,dy);
+    if (dist<2){ sq.phase="WORK"; sq.prog=0; sq.heat=0;
+      if (sq.player) tick("141 on objective — "+sq.op.desc,"team");
+      return; }
+    var sp=((sq.player&&sq.urge)?9:6)*dt; sq.x+=dx/dist*sp; sq.y+=dy/dist*sp;
+    return;
+  }
+  if (sq.phase==="WORK"){
+    sq.prog += dt*((sq.player&&sq.urge)?11:6.5)*sq.morale;
+    // working squads push their surroundings — THIS is why blufor advances
+    blast(sq.x,sq.y,3,sq.side*0.05*dt*6);
+    if (sq.player){
+      sq.heat += dt*(sq.urge?1.4:0.55)*(1+Math.max(0,-S.c[((sq.y|0)*GW+(sq.x|0))]||0)*0.8);
+      if (!S.cue && Math.random()<dt*0.3) raiseRequest(sq);
+      if (sq.heat>10 && Math.random()<dt*0.18) teamHit(sq,"taking fire on the objective");
+    } else if (Math.random()<dt*0.02){ sq.phase="DOWN"; sq.pt=12;
+      if (sq.side>0) tick(sq.name+" mauled — pulling out","bad");
+    }
+    if (sq.prog>=100){ opComplete(sq); if (sq.player) S.cue=null; sq.phase="EXFIL"; }
+    return;
+  }
+  if (sq.phase==="EXFIL"){
+    var hx=sq.side>0?4:GW-4;
+    var dx2=hx-sq.x, dy2=GH/2-sq.y, d2=Math.hypot(dx2,dy2);
+    if (d2<3){ sq.phase="STAGING"; sq.pt=5+Math.random()*3; return; }
+    sq.x+=dx2/d2*7*dt; sq.y+=dy2/d2*7*dt;
+  }
+}
+function pickObjective(sq){
+  if (sq.player && S.designated>=0){
+    var bx=S.designated%BX, by=(S.designated/BX)|0;
+    var sum=0,n2=0;
+    for (var y=0;y<BW;y++) for (var x=0;x<BW;x++){
+      var i=(by*BW+y)*GW+(bx*BW+x); if (!S.terr[i]){sum+=S.c[i];n2++;} }
+    S.designated=-1;
+    return {b:by*BX+bx,x:bx,y:by,frac:1,mean:n2?sum/n2:0};
+  }
+  var mine=S.hotspots.filter(function(h){ return h.mean*sq.side<0.15; });
+  if (mine.length) return mine[(Math.random()*Math.min(2,mine.length))|0];
+  return S.hotspots[0]||null;
+}
+function teamHit(sq,why){
+  sq.hp--; sq.heat=Math.max(0,sq.heat-6);
+  tick("141: man down — "+why,"bad");
+  S.receipts.push("▼ 141 casualty — "+why);
+  if (sq.hp<=0){ sq.phase="DOWN"; sq.pt=20; sq.morale=Math.max(0.5,sq.morale-0.2); S.cue=null;
+    tick("141 COMBAT INEFFECTIVE — extracting under fire","bad");
+    S.receipts.push("██ 141 wiped to extraction — refit, morale down.");
+  }
+}
+/* requests vary with the op — it is not always sabotage and rig */
+var REQ_POOLS={
+  DA:[["APPROVE CHARGES","−80 req",function(){return S.req>=80;},
+        function(sq){S.req-=80;sq.prog+=30;tick("141: charges set — ahead of schedule","up");},
+        function(sq){tick("141: copy — slow way then","team");}],
+      ["CAS DANGER-CLOSE","−1 cas",function(){return S.cas>0;},
+        function(sq){S.cas--;blast(sq.x,sq.y,8,0.5);sq.heat=0;tick("CAS in — danger close","up");},
+        function(sq){sq.prog=Math.max(0,sq.prog-15);tick("141: no air — breaking contact","team");}]],
+  SR:[["APPROVE BRIBE","−100 req",function(){return S.req>=100;},
+        function(sq){S.req-=100;sq.prog+=35;tick("141: asset paid — doors open","up");},
+        function(sq){sq.heat+=2;tick("141: going in dirty","team");}],
+      ["APPROVE RIG","−60 req",function(){return S.req>=60;},
+        function(sq){S.req-=60;sq.heat=Math.max(0,sq.heat-4);tick("141: decoys out — heat off","up");},
+        function(sq){sq.heat+=1.5;tick("141: negative — staying loud","team");}]],
+  TG:[["APPROVE RELAY","−1 MAT",function(){return S.mat>=1;},
+        function(sq){S.mat--;sq.prog+=40;tick("141: relay burned in — uplink hot","up");},
+        function(sq){tick("141: hand-cranking the array","team");}],
+      ["APPROVE RIG","−60 req",function(){return S.req>=60;},
+        function(sq){S.req-=60;sq.heat=Math.max(0,sq.heat-4);tick("141: decoys out","up");},
+        function(sq){sq.heat+=1.5;}]],
+  UW:[["APPROVE ARMS DROP","−120 req",function(){return S.req>=120;},
+        function(sq){S.req-=120;blast(sq.x,sq.y,6,0.35);tick("141: locals armed — line surging","up");},
+        function(sq){tick("141: holding with what we have","team");}],
+      ["CAS DANGER-CLOSE","−1 cas",function(){return S.cas>0;},
+        function(sq){S.cas--;blast(sq.x,sq.y,8,0.5);sq.heat=0;tick("CAS in — danger close","up");},
+        function(sq){sq.prog=Math.max(0,sq.prog-15);}]],
+};
+function raiseRequest(sq){
+  var pool=(REQ_POOLS[sq.op.id]||REQ_POOLS.DA).filter(function(r){return r[2]();});
   if (!pool.length) return;
   var r=pool[(Math.random()*pool.length)|0];
-  S.cue={ r:r, left:6, dur:6 };
-  cue("141 requests: "+r.verb+" ("+r.cost+")","req");
+  S.cue={ verb:r[0], cost:r[1], yes:r[3], no:r[4], sq:sq, left:6, dur:6 };
+  tick("141 requests: "+r[0]+" ("+r[1]+")","rq");
 }
 
 /* ================= warclock ================= */
 function advance(dt){
   if (S.over||S.paused) return;
   S.t-=dt;
-  S.aggression=0.0008+ (1-S.t/240)*0.0016;          // theatre presses harder late
-  S.caTimer=(S.caTimer||0)+dt;                      // CA runs on its own cadence,
-  if (S.caTimer>=0.12){ S.caTimer-=0.12; caStep(); }// NOT per frame — 60x/s was a flood
+  S.caTimer+=dt; if (S.caTimer>=0.12){ S.caTimer-=0.12; caStep(); }
   S.hotTimer+=dt; if (S.hotTimer>0.6){ S.hotTimer=0; findHotspots(); }
-  teamTick(dt);
-  if (S.cue){ S.cue.left-=dt;
-    if (S.cue.left<=0){ S.cue.r.no(); S.cue=null; } }
+  S.squads.forEach(function(sq){ squadTick(sq,dt); });
+  if (S.cue){ S.cue.left-=dt; if (S.cue.left<=0){ S.cue.no(S.cue.sq); S.cue=null; } }
   S.req+=dt*2;
   S.tide=tideCalc(); S.hist.push(S.tide);
   if (S.t<=0 || Math.abs(S.tide)>0.55) end();
@@ -297,60 +363,55 @@ function end(){
         S.tide>-0.25?"MARGINAL LOSS":"COLLAPSE";
   document.getElementById("verdict").textContent=v;
   document.getElementById("receipts").innerHTML=
-    "FINAL TIDE "+(S.tide*100).toFixed(0)+"% · REQ "+(S.req|0)+" · CAS "+S.cas
-    +" · 141 "+S.team.hp+"/4\n\n"+(S.receipts.length?S.receipts.join("\n"):"(no operations)");
+    "FINAL TIDE "+(S.tide*100).toFixed(0)+"% · REQ "+(S.req|0)+" · CAS "+S.cas+" · MAT "+S.mat
+    +"\n\n"+(S.receipts.length?S.receipts.join("\n"):"(no operations)");
   document.getElementById("debrief").classList.add("on");
 }
 
 /* ================= render ================= */
 function renderMap(){
-  var now=performance.now()/1000;
-  var px=img.data;
+  var now=performance.now()/1000, px=img.data;
   for (var i=0;i<N;i++){
     var o=i*4, v=S.c[i];
     if (S.terr[i]){ px[o]=46;px[o+1]=46;px[o+2]=53;px[o+3]=255; continue; }
-    if (v>0.05){ var g=0.2+v*0.68;
-      px[o]=216*g; px[o+1]=255*g; px[o+2]=61*g; }
-    else if (v<-0.05){ var f=0.2-v*0.68;
-      px[o]=255*f; px[o+1]=90*f; px[o+2]=42*f; }
+    if (v>0.05){ var g=0.2+v*0.68; px[o]=216*g; px[o+1]=255*g; px[o+2]=61*g; }
+    else if (v<-0.05){ var f=0.2-v*0.68; px[o]=255*f; px[o+1]=90*f; px[o+2]=42*f; }
     else { px[o]=32;px[o+1]=33;px[o+2]=38; }
     px[o+3]=255;
   }
   bctx.putImageData(img,0,0);
   mctx.clearRect(0,0,mapC.width,mapC.height);
   mctx.drawImage(buf,0,0,GW,GH,0,0,mapC.width,mapC.height);
-  var sx=mapC.width/GW, sy=mapC.height/GH;
+  var sx=mapC.width/GW, sy=mapC.height/GH, d=window.devicePixelRatio||1;
 
-  // hotspot marks: only clotted masses earn a symbol, sized by mass
   mctx.textAlign="center"; mctx.textBaseline="middle";
   S.hotspots.forEach(function(h){
     var cx=(h.x*BW+BW/2)*sx, cy2=(h.y*BW+BW/2)*sy;
-    var sz=(10+h.frac*16)*(window.devicePixelRatio||1);
-    mctx.font=sz+"px monospace";
+    mctx.font=((10+h.frac*16)*d)+"px monospace";
     mctx.fillStyle = h.mean<-0.05?"rgba(255,90,42,.9)": h.mean>0.05?"rgba(216,255,61,.9)":"rgba(255,182,61,.9)";
     mctx.fillText("◈",cx,cy2);
   });
-  // designated objective
   if (S.designated>=0){
     var dbx=S.designated%BX, dby=(S.designated/BX)|0;
     mctx.strokeStyle="#ffb63d"; mctx.lineWidth=2; mctx.setLineDash([5,4]);
     mctx.lineDashOffset=-now*8;
     mctx.strokeRect(dbx*BW*sx,dby*BW*sy,BW*sx,BW*sy); mctx.setLineDash([]);
   }
-  // the team: a white pip you learn to watch
-  var T=S.team;
-  if (T.phase!=="DOWN" && T.phase!=="STAGING"){
-    var blink=T.phase==="WORK" ? (Math.sin(now*7)>0?1:0.35) : 1;
-    mctx.fillStyle="rgba(232,228,216,"+blink+")";
-    mctx.fillRect(T.x*sx-3,T.y*sy-3,6,6);
-    if (T.obj){ mctx.strokeStyle="rgba(232,228,216,.35)"; mctx.lineWidth=1;
-      mctx.beginPath(); mctx.moveTo(T.x*sx,T.y*sy);
-      mctx.lineTo((T.obj.x*BW+BW/2)*sx,(T.obj.y*BW+BW/2)*sy); mctx.stroke(); }
-    if (T.phase==="WORK"){                             // progress arc over the pip
-      mctx.strokeStyle="#d8ff3d"; mctx.lineWidth=2.5;
-      mctx.beginPath(); mctx.arc(T.x*sx,T.y*sy,9,-Math.PI/2,-Math.PI/2+T.prog/100*Math.PI*2); mctx.stroke();
+  S.squads.forEach(function(sq){
+    if (sq.phase==="DOWN"||sq.phase==="STAGING") return;
+    var col = sq.player?"232,228,216": sq.side>0?"216,255,61":"255,90,42";
+    var blink = sq.phase==="WORK" ? (Math.sin(now*7+sq.x)>0?1:0.4) : 0.95;
+    mctx.fillStyle="rgba("+col+","+blink+")";
+    var s3=sq.player?3.2:2.4;
+    mctx.fillRect(sq.x*sx-s3,sq.y*sy-s3,s3*2,s3*2);
+    if (sq.player){
+      if (sq.obj){ mctx.strokeStyle="rgba(232,228,216,.35)"; mctx.lineWidth=1;
+        mctx.beginPath(); mctx.moveTo(sq.x*sx,sq.y*sy);
+        mctx.lineTo((sq.obj.x*BW+BW/2)*sx,(sq.obj.y*BW+BW/2)*sy); mctx.stroke(); }
+      if (sq.phase==="WORK"){ mctx.strokeStyle="#d8ff3d"; mctx.lineWidth=2.5;
+        mctx.beginPath(); mctx.arc(sq.x*sx,sq.y*sy,9,-Math.PI/2,-Math.PI/2+sq.prog/100*Math.PI*2); mctx.stroke(); }
     }
-  }
+  });
 }
 function mark(label,up){ S.marks.push({k:S.hist.length,label:label,up:up}); }
 function renderTrend(){
@@ -376,47 +437,64 @@ function renderTrend(){
     tctx.fillText(m.label,xx,(idx%2?Math.min(H-4,yy+13):Math.max(9,yy-7)));
   });
 }
-var cues=[];
-function cue(m,cls){ cues.unshift({m:m,cls:cls||""});
-  if (cues.length>5) cues.pop();
-  document.getElementById("cues").innerHTML=cues.map(function(c2){
-    return '<div class="cue '+c2.cls+'">'+c2.m+'</div>'; }).join(""); }
+/* the ticker */
+var ticks=[];
+function tick(m,cls){
+  ticks.unshift({m:m,cls:cls||""}); if (ticks.length>8) ticks.pop();
+  document.getElementById("tickin").innerHTML=ticks.map(function(t2){
+    return '<span class="'+t2.cls+'">'+t2.m+'</span>'; }).join('<span class="sep">◆</span>');
+}
 function renderDeck(){
-  var T=S.team;
   var st=[["TIDE",(S.tide>=0?"+":"")+(S.tide*100|0)+"%",S.tide<0],
-          ["REQ",S.req|0,S.req<80],["CAS",S.cas,S.cas===0],
-          ["141",T.hp+"/4 "+T.phase,T.hp<=1],
-          ["MORALE",(T.morale*100|0)+"%",T.morale<0.8]];
+          ["REQ",S.req|0,S.req<80],["CAS",S.cas,S.cas===0],["MAT",S.mat,false]];
   document.getElementById("stats").innerHTML=st.map(function(s2){
     return '<div class="stat'+(s2[2]?" low":"")+'"><span class="k">'+s2[0]+'</span><span class="v">'+s2[1]+'</span></div>';
   }).join("");
+  // squad board
+  var blu=S.squads.filter(function(q){return q.side>0;});
+  var hos=S.squads.filter(function(q){return q.side<0 && q.phase!=="DOWN";}).length;
+  document.getElementById("squads").innerHTML = blu.map(function(q){
+    var pips=""; for (var k=0;k<4;k++) pips+= k<q.hp?"<b>▮</b>":"<span>▯</span>";
+    var st2=q.phase+(q.op&&(q.phase==="INSERT"||q.phase==="WORK")?" · "+q.op.name:"")
+      +(q.phase==="WORK"?" "+(q.prog|0)+"%":"");
+    return '<div class="sq'+(q.player?" mine":"")+'"><span class="nm">'+q.name+'</span>'
+      +'<span class="st">'+st2+'</span><span class="hp">'+pips+'</span></div>';
+  }).join("") + '<div id="hostiles">HOSTILE NET: '+hos+' active cell'+(hos===1?"":"s")+'</div>';
   var rb=document.getElementById("reqbar");
   if (S.cue){ rb.classList.add("on");
-    document.getElementById("reqtxt").textContent="141 REQUESTS "+S.cue.r.verb+" — "+S.cue.r.cost;
+    document.getElementById("reqtxt").textContent="141 REQUESTS "+S.cue.verb+" — "+S.cue.cost;
     rb.querySelector("#reqwin i").style.width=(S.cue.left/S.cue.dur*100)+"%";
   } else rb.classList.remove("on");
   document.getElementById("bclock").textContent=Math.max(0,S.t).toFixed(0);
   var tp=document.getElementById("tidepct");
-  tp.textContent=(S.tide>=0?"+":"")+(S.tide*100).toFixed(0)+"%";
+  tp.textContent="TIDE "+(S.tide>=0?"+":"")+(S.tide*100).toFixed(0)+"%";
   tp.style.color=S.tide>=0?"#d8ff3d":"#ff5a2a";
   renderButtons();
 }
 
-/* ============ buttons: 4 fixed slots, press-to-arm, press-to-fire ============ */
+/* ============ buttons: 4 slots, press-arm-confirm ============ */
+function me(){ return S.squads[0]; }
 var BTN=[
-  { label:function(){ return S.cue ? "✓ "+S.cue.r.verb : "— NO REQUEST —"; },
+  { label:function(){ return S.cue ? "✓ "+S.cue.verb : "— NO REQUEST —"; },
     hot:function(){ return !!S.cue; }, can:function(){ return !!S.cue; },
-    fire:function(){ var c2=S.cue; S.cue=null; c2.r.yes(); } },
-  { label:function(){ return S.team.urge?"URGING ▮":"URGE 141"; },
-    tog:function(){ return S.team.urge; }, can:function(){ return S.team.hp>0; },
-    fire:function(){ S.team.urge=!S.team.urge;
-      cue(S.team.urge?"you: push. 141: pushing.":"you: steady. 141: copy.","team"); } },
-  { label:function(){ return "CAS COVER"; }, can:function(){ return S.cas>0&&S.team.phase!=="DOWN"; },
-    fire:function(){ S.cas--; blast(S.team.x,S.team.y,9,0.5); S.team.heat=0;
-      mark("CAS",true); cue("CAS cover on 141's position.","up"); } },
+    fire:function(){ var c2=S.cue; S.cue=null; c2.yes(c2.sq); } },
+  { label:function(){ return me().urge?"URGING ▮":"URGE 141"; },
+    tog:function(){ return me().urge; }, can:function(){ return me().hp>0; },
+    fire:function(){ me().urge=!me().urge;
+      tick(me().urge?"you: push. 141: pushing":"you: steady. 141: copy","team"); } },
+  { label:function(){ return S.mat>0 ? "BARRAGE ▮"+S.mat : "CAS COVER"; },
+    can:function(){ return S.mat>0 ? true : (S.cas>0 && me().phase!=="DOWN"); },
+    fire:function(){
+      if (S.mat>0){ S.mat--;
+        var tgts=S.hotspots.filter(function(h){return h.mean<0;}).slice(0,3);
+        tgts.forEach(function(h){ blast(h.x*BW+BW/2,h.y*BW+BW/2,7,0.55); });
+        mark("BRG",true); tick("THEATRE BARRAGE — "+tgts.length+" hostile masses struck","up");
+        S.receipts.push("◈ BARRAGE — "+tgts.length+" strikes (uplink materiel spent)");
+      } else { S.cas--; blast(me().x,me().y,8,0.5); me().heat=0;
+        mark("CAS",true); tick("CAS cover on 141","up"); } } },
   { label:function(){ return "RECALL 141"; },
-    can:function(){ return S.team.phase==="INSERT"||S.team.phase==="WORK"; },
-    fire:function(){ S.team.phase="EXFIL"; S.cue=null; cue("you: abort. 141 exfiltrating.","team"); } },
+    can:function(){ return me().phase==="INSERT"||me().phase==="WORK"; },
+    fire:function(){ me().phase="EXFIL"; S.cue=null; tick("you: abort. 141 exfiltrating","team"); } },
 ];
 function renderButtons(){
   for (var k=0;k<4;k++){
@@ -434,17 +512,13 @@ function renderButtons(){
     else { for(var j=0;j<4;j++) S.arm[j]=0; S.arm[k]=2.5; renderButtons(); }
   });
 });
-
-/* map tap = designate objective block */
 mapC.addEventListener("pointerdown",function(e){
   var r=mapC.getBoundingClientRect();
   var bx=((e.clientX-r.left)/r.width*BX)|0, by=((e.clientY-r.top)/r.height*BY)|0;
   if (bx<0||bx>=BX||by<0||by>=BY) return;
   S.designated=by*BX+bx;
-  cue("objective designated: "+bname({x:bx,y:by})+" — 141 will take it next.","team");
+  tick("objective designated: "+bname({x:bx,y:by})+" — 141 takes it next","team");
 });
-function bname(b){ return String.fromCharCode(65+b.y)+"-"+(b.x+1); }
-
 document.getElementById("btnpause").addEventListener("click",function(){
   S.paused=!S.paused;
   this.textContent=S.paused?"▶":"⏸"; this.classList.toggle("on",S.paused);
