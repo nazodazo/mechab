@@ -185,17 +185,19 @@ function caStep(){
   }
 }
 function findHotspots(){
+  // a hotspot needs BOTH forces present in the block — empty neutral ground
+  // is not a battle, it's just unclaimed
   var hs=[];
   for (var by=0;by<BY;by++) for (var bx=0;bx<BX;bx++){
-    var cont=0,sum=0,n2=0;
+    var pos=0,neg=0,sum=0,n2=0;
     for (var y=0;y<BW;y++) for (var x=0;x<BW;x++){
       var i=(by*BW+y)*GW+(bx*BW+x);
       if (S.terr[i]) continue; n2++; sum+=S.c[i];
-      if (Math.abs(S.c[i])<0.35) cont++;
+      if (S.c[i]>0.12) pos++; else if (S.c[i]<-0.12) neg++;
     }
     if (!n2) continue;
-    var frac=cont/n2;
-    if (frac>0.5) hs.push({b:by*BX+bx,x:bx,y:by,frac:frac,mean:sum/n2});
+    var clash=Math.min(pos,neg)/n2;          // how much of the block is a two-sided fight
+    if (clash>0.12) hs.push({b:by*BX+bx,x:bx,y:by,frac:Math.min(1,clash*3),mean:sum/n2});
   }
   hs.sort(function(a,b){return b.frac-a.frac;});
   S.hotspots=hs.slice(0,6);
@@ -299,7 +301,10 @@ function pickObjective(sq){
   }
   var mine=S.hotspots.filter(function(h){ return h.mean*sq.side<0.15; });
   if (mine.length) return mine[(Math.random()*Math.min(2,mine.length))|0];
-  return S.hotspots[0]||null;
+  if (S.hotspots.length) return S.hotspots[0];
+  // no battle yet: advance on the neutral middle and start one
+  var bx=(BX/2-1+(Math.random()*3|0))|0, by=(Math.random()*BY)|0;
+  return {b:by*BX+bx,x:bx,y:by,frac:0.5,mean:0};
 }
 function teamHit(sq,why){
   sq.hp--; sq.heat=Math.max(0,sq.heat-6);
