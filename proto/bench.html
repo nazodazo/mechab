@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+<title>WORKBENCH // reactor proto</title>
+<style>
+:root{
+  --bg:#0a0a0c; --panel:#101014; --ink:#e8e4d8; --dim:#6f6c62; --line:#232329;
+  --us:#d8ff3d; --foe:#ff5a2a; --amber:#ffb63d; --navy:#3d5a80;
+  --mono:"SF Mono",ui-monospace,"Cascadia Mono","Roboto Mono",Consolas,monospace;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0}
+html,body{height:100%;overflow:hidden}
+body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
+  font-family:var(--mono);font-size:12px;line-height:1.35;
+  -webkit-user-select:none;user-select:none;overscroll-behavior:none;display:flex;justify-content:center}
+@supports (height:100dvh){ html,body{height:100dvh} }
+#device{width:100%;max-width:460px;height:100%;display:flex;flex-direction:column;gap:6px;
+  padding:calc(6px + env(safe-area-inset-top)) 10px calc(8px + env(safe-area-inset-bottom))}
+.panel{border:1px solid var(--line);background:var(--panel);position:relative}
+.panel>.ph{position:absolute;top:-1px;left:8px;transform:translateY(-50%);
+  background:var(--bg);padding:0 6px;font-size:9px;letter-spacing:.18em;color:var(--dim)}
+
+/* top 20%: three 5-cell voxel gauges */
+#gauges{height:20%;flex:none;padding:12px 10px 8px;display:flex;flex-direction:column;gap:6px;justify-content:center}
+.grow{display:grid;grid-template-columns:64px repeat(5,1fr);gap:4px;align-items:center;height:26%}
+.grow .gl{color:var(--dim);font-size:9px;letter-spacing:.12em}
+.cell{height:100%;min-height:14px;background:#141416;border:1px solid #1c1c21;position:relative}
+.cell.g{background:var(--us);opacity:.82}
+.cell.n{background:var(--navy);opacity:.75}
+.cell.r{background:var(--foe);opacity:.85}
+.cell.op::after{content:"";position:absolute;inset:-3px;border:2px solid var(--ink)}
+.cell.blink{animation:bk .5s steps(2) infinite}
+@keyframes bk{50%{opacity:.15}}
+
+/* middle 60%: workbench */
+#bench{flex:1;padding:12px 8px 8px;display:flex;flex-direction:column;gap:6px}
+#schem{flex:1;width:100%;display:block;touch-action:none}
+#oprow{display:flex;gap:10px;align-items:center;padding:0 4px}
+#oprow .gl{color:var(--dim);font-size:9px;letter-spacing:.12em;white-space:nowrap}
+#op{flex:1;-webkit-appearance:none;appearance:none;height:22px;background:transparent}
+#op::-webkit-slider-runnable-track{height:4px;background:var(--line)}
+#op::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;margin-top:-9px;
+  background:var(--bg);border:2px solid var(--us)}
+#opv{color:var(--us);font-variant-numeric:tabular-nums;width:38px;text-align:right}
+
+/* bottom 20%: infomatics / picker */
+#deck{height:20%;flex:none;padding:10px 8px 8px;display:flex;flex-direction:column;gap:5px;overflow:hidden}
+#stats{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+.stat{border:1px solid var(--line);padding:3px 5px;background:var(--bg)}
+.stat .k{color:var(--dim);font-size:8px;letter-spacing:.1em}
+.stat .v{font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.stat.low .v{color:var(--foe)}
+#msg{flex:1;color:var(--dim);font-size:11px;white-space:pre-wrap;overflow:hidden;padding:0 2px}
+#msg b{color:var(--ink);font-weight:400} #msg .up{color:var(--us)} #msg .bad{color:var(--foe)} #msg .rq{color:var(--amber)}
+#actions{display:flex;gap:6px}
+#actions button{flex:1;padding:10px;font-family:var(--mono);font-size:12px;letter-spacing:.12em;
+  background:var(--bg);border:1px solid var(--line);color:var(--ink);touch-action:manipulation}
+#btnspin{border-color:var(--us);color:var(--us)}
+#actions button:active{background:var(--ink);color:var(--bg)}
+#actions button[disabled]{opacity:.3}
+#picker{display:none;flex-direction:column;gap:4px;flex:1}
+#picker.on{display:flex}
+#deck.picking #stats,#deck.picking #msg{display:none}
+.pick{display:flex;justify-content:space-between;background:var(--bg);border:1px solid var(--line);
+  color:var(--ink);font-family:var(--mono);font-size:12px;padding:7px 10px;touch-action:manipulation}
+.pick.sel{border-color:var(--us)}
+.pick .d{color:var(--dim);font-size:10px}
+.pick:active{background:var(--ink);color:var(--bg)}
+</style>
+</head>
+<body>
+<main id="device">
+  <section id="gauges" class="panel"><span class="ph">PERFORMANCE ENVELOPE — load 10→90%</span>
+    <div class="grow"><span class="gl">OUTPUT</span><div class="cell" id="c00"></div><div class="cell" id="c01"></div><div class="cell" id="c02"></div><div class="cell" id="c03"></div><div class="cell" id="c04"></div></div>
+    <div class="grow"><span class="gl">THERMAL</span><div class="cell" id="c10"></div><div class="cell" id="c11"></div><div class="cell" id="c12"></div><div class="cell" id="c13"></div><div class="cell" id="c14"></div></div>
+    <div class="grow"><span class="gl">STABILITY</span><div class="cell" id="c20"></div><div class="cell" id="c21"></div><div class="cell" id="c22"></div><div class="cell" id="c23"></div><div class="cell" id="c24"></div></div>
+  </section>
+
+  <section id="bench" class="panel"><span class="ph">WORKBENCH — REACTOR MK I</span>
+    <canvas id="schem"></canvas>
+    <div id="oprow"><span class="gl">OPERATING POINT</span>
+      <input type="range" id="op" min="10" max="90" value="50" />
+      <span id="opv">50%</span></div>
+  </section>
+
+  <section id="deck" class="panel"><span class="ph">DECK</span>
+    <div id="stats"></div>
+    <div id="msg">tap a station on the schematic to refit it.\nSPIN UP costs 1 test article.</div>
+    <div id="picker"></div>
+    <div id="actions">
+      <button id="btnreturn" style="display:none">◂ RETURN</button>
+      <button id="btnenter" style="display:none">ENTER ▸</button>
+      <button id="btnspin">▸ SPIN UP</button>
+    </div>
+  </section>
+</main>
+
+<script>
+"use strict";
+/* ============ components: few parts, strong couplings ============ */
+var LIB = {
+  CORE:      [{n:"SALVAGE CORE", d:"pow 6 · tame",    pow:6,  heat:1.0, stab:0.75},
+              {n:"MIL REACTOR",  d:"pow 10 · warm",   pow:10, heat:1.35,stab:0.9},
+              {n:"OVERCLOCK",    d:"pow 15 · angry",  pow:15, heat:1.9, stab:0.5}],
+  INJECTOR:  [{n:"LEAN FEED",    d:"×1.0 · cool",     boost:1.0, heat:0.9, stab:0.1},
+              {n:"RICH FEED",    d:"×1.25 · hot",     boost:1.25,heat:1.35,stab:0},
+              {n:"PULSE FEED",   d:"×1.5 · unstable", boost:1.5, heat:1.6, stab:-0.18}],
+  COOLANT:   [{n:"PASSIVE FINS", d:"cool ×1 · free",  cool:1.0, drag:0},
+              {n:"LOOP PUMP",    d:"cool ×1.6 · drag",cool:1.6, drag:0.06},
+              {n:"CRYO LOOP",    d:"cool ×2.3 · heavy drag", cool:2.3, drag:0.14}],
+  EXCHANGER: [{n:"MESH",         d:"relief 2",        relief:2, drag:0.02},
+              {n:"PLATE STACK",  d:"relief 4",        relief:4, drag:0.06},
+              {n:"VAPOR CHAMBER",d:"relief 7 · drag", relief:7, drag:0.12}],
+  GOVERNOR:  [{n:"NONE",         d:"raw output",      eff:1.0,  damp:0},
+              {n:"ANALOG",       d:"damped · −5% out",eff:0.95, damp:0.2},
+              {n:"ADAPTIVE",     d:"stable · −10% out",eff:0.9, damp:0.4}],
+};
+var ORDER=["CORE","INJECTOR","COOLANT","EXCHANGER","GOVERNOR"];
+var S={ fit:{CORE:0,INJECTOR:0,COOLANT:0,EXCHANGER:0,GOVERNOR:0},
+        op:0.5, tests:5, best:null, found:{}, testing:null, pick:null, pickSel:0 };
+
+/* ============ the physics: coupled, legible, with one hidden resonance ============ */
+function parts(){ var p={}; ORDER.forEach(function(s){ p[s]=LIB[s][S.fit[s]]; }); return p; }
+function resonant(p){ return p.INJECTOR.n==="PULSE FEED" && p.COOLANT.n==="CRYO LOOP"; }
+function metrics(load){
+  var p=parts(), res=resonant(p);
+  var rawHeat = Math.pow(load,1.7)*11*p.CORE.heat*p.INJECTOR.heat*(res?0.82:1);
+  var cooled  = Math.max(0, rawHeat/p.COOLANT.cool - p.EXCHANGER.relief);
+  var margin  = 10-cooled;                                   // <0 = scram territory
+  var drag    = p.COOLANT.drag+p.EXCHANGER.drag;
+  var output  = p.CORE.pow*p.INJECTOR.boost*load*(1-drag)*p.GOVERNOR.eff;
+  var stab    = (p.CORE.stab+p.INJECTOR.stab+p.GOVERNOR.damp+(res?0.25:0)) - load*0.85
+              - (margin<2 ? 0.3 : 0);
+  return { out:output, margin:margin, stab:stab };
+}
+
+/* ============ gauges: distributions across the envelope, not fill bars ============ */
+var LOADS=[0.1,0.3,0.5,0.7,0.9];
+function cellClass(row,m){
+  if (row===0) return m.out>=7?"g":m.out>=3.2?"n":"r";
+  if (row===1) return m.margin>=4?"g":m.margin>=1.5?"n":"r";
+  return m.stab>=0.45?"g":m.stab>=0.2?"n":"r";
+}
+function renderGauges(fault){
+  var opIdx=Math.round((S.op-0.1)/0.2);
+  for (var r=0;r<3;r++) for (var k=0;k<5;k++){
+    var el=document.getElementById("c"+r+k), m=metrics(LOADS[k]);
+    el.className="cell "+cellClass(r,m)
+      +(k===opIdx?" op":"")
+      +((fault && fault.row===r && k===opIdx)?" blink":"");
+  }
+}
+
+/* ============ schematic ============ */
+var sc=document.getElementById("schem"), sctx=sc.getContext("2d");
+var NODES;  // station boxes, laid out as a loop
+function fit(){ var r=sc.getBoundingClientRect(),d=window.devicePixelRatio||1;
+  sc.width=r.width*d; sc.height=r.height*d;
+  var W=sc.width,H=sc.height,bw=W*0.26,bh=H*0.2;
+  NODES={
+    CORE:      {x:W*0.5-bw/2, y:H*0.40-bh/2, w:bw,h:bh},
+    INJECTOR:  {x:W*0.08,     y:H*0.08,      w:bw,h:bh},
+    COOLANT:   {x:W*0.66,     y:H*0.08,      w:bw,h:bh},
+    EXCHANGER: {x:W*0.66,     y:H*0.72,      w:bw,h:bh},
+    GOVERNOR:  {x:W*0.08,     y:H*0.72,      w:bw,h:bh},
+  };
+}
+function lineColor(v,lo,hi){ return v<lo?"#ff5a2a":v<hi?"#3d5a80":"#d8ff3d"; }
+function renderSchem(){
+  var W=sc.width,H=sc.height,d=window.devicePixelRatio||1;
+  sctx.fillStyle="#101014"; sctx.fillRect(0,0,W,H);
+  var m=metrics(S.op), p=parts();
+  // flow lines: injector->core (feed), core->coolant->exchanger (thermal), governor->core
+  link("INJECTOR","CORE", lineColor(m.stab,0.2,0.45));
+  link("CORE","COOLANT",  lineColor(m.margin,1.5,4));
+  link("COOLANT","EXCHANGER", lineColor(m.margin,1.5,4));
+  link("GOVERNOR","CORE", "#3d5a80");
+  link("EXCHANGER","GOVERNOR","#232329");
+  ORDER.forEach(function(s){
+    var n=NODES[s], hot=S.pick===s;
+    sctx.fillStyle="#0a0a0c"; sctx.fillRect(n.x,n.y,n.w,n.h);
+    sctx.strokeStyle=hot?"#d8ff3d":"#3a3a42"; sctx.lineWidth=hot?3:1.5;
+    sctx.strokeRect(n.x,n.y,n.w,n.h);
+    sctx.fillStyle="#6f6c62"; sctx.font=(9*d)+"px monospace"; sctx.textAlign="left";
+    sctx.fillText(s, n.x+5*d, n.y+11*d);
+    sctx.fillStyle="#e8e4d8"; sctx.font=(10*d)+"px monospace";
+    sctx.fillText(LIB[s][S.fit[s]].n, n.x+5*d, n.y+n.h-7*d);
+  });
+  // live test trace overlays the middle
+  if (S.testing){
+    var T=S.testing;
+    sctx.strokeStyle=T.fault?"#ff5a2a":"#d8ff3d"; sctx.lineWidth=2;
+    sctx.beginPath();
+    T.trace.forEach(function(v,i){
+      var x=W*0.06+ (W*0.88)*(i/(T.dur*30));
+      var y=H*0.60 - v*H*0.28;
+      i?sctx.lineTo(x,y):sctx.moveTo(x,y);
+    });
+    sctx.stroke();
+  }
+  function link(a,b,c){
+    var A=NODES[a],B=NODES[b];
+    sctx.strokeStyle=c; sctx.lineWidth=2.5;
+    sctx.beginPath(); sctx.moveTo(A.x+A.w/2,A.y+A.h/2); sctx.lineTo(B.x+B.w/2,B.y+B.h/2); sctx.stroke();
+  }
+}
+
+/* ============ deck ============ */
+function renderDeck(){
+  var m=metrics(S.op);
+  var st=[["OUTPUT",m.out.toFixed(1),m.out<3.2],["MARGIN",m.margin.toFixed(1),m.margin<1.5],
+          ["STAB",m.stab.toFixed(2),m.stab<0.2],["TESTS",S.tests,S.tests===0],
+          ["RATING",S.best?S.best:"—",false]];
+  document.getElementById("stats").innerHTML=st.map(function(s){
+    return '<div class="stat'+(s[2]?" low":"")+'"><div class="k">'+s[0]+'</div><div class="v">'+s[1]+'</div></div>';
+  }).join("");
+  document.getElementById("btnspin").disabled=S.tests<=0||!!S.testing;
+}
+function msg(html){ document.getElementById("msg").innerHTML=html; }
+
+/* picker flow: tap station -> options + RETURN/ENTER */
+var deck=document.getElementById("deck");
+function openPick(s){
+  S.pick=s; S.pickSel=S.fit[s];
+  deck.classList.add("picking");
+  document.getElementById("picker").classList.add("on");
+  document.getElementById("btnreturn").style.display="";
+  document.getElementById("btnenter").style.display="";
+  document.getElementById("btnspin").style.display="none";
+  renderPick();
+}
+function renderPick(){
+  document.getElementById("picker").innerHTML=LIB[S.pick].map(function(c,k){
+    return '<button class="pick'+(k===S.pickSel?" sel":"")+'" data-k="'+k+'">'
+      +'<span>'+c.n+'</span><span class="d">'+c.d+'</span></button>';
+  }).join("");
+}
+function closePick(commit){
+  if (commit && S.pick){ S.fit[S.pick]=S.pickSel; }
+  S.pick=null;
+  deck.classList.remove("picking");
+  document.getElementById("picker").classList.remove("on");
+  document.getElementById("btnreturn").style.display="none";
+  document.getElementById("btnenter").style.display="none";
+  document.getElementById("btnspin").style.display="";
+  renderAll();
+}
+document.getElementById("picker").addEventListener("click",function(e){
+  var b=e.target.closest(".pick"); if(!b)return;
+  S.pickSel=+b.dataset.k; renderPick(); renderGauges(); // live preview? keep committed-only: preview via gauges after ENTER
+});
+document.getElementById("btnreturn").addEventListener("click",function(){ closePick(false); });
+document.getElementById("btnenter").addEventListener("click",function(){ closePick(true); });
+sc.addEventListener("pointerdown",function(e){
+  if (S.testing) return;
+  var r=sc.getBoundingClientRect(),d=window.devicePixelRatio||1;
+  var x=(e.clientX-r.left)*d, y=(e.clientY-r.top)*d;
+  for (var i=0;i<ORDER.length;i++){
+    var n=NODES[ORDER[i]];
+    if (x>=n.x&&x<=n.x+n.w&&y>=n.y&&y<=n.y+n.h){ openPick(ORDER[i]); return; }
+  }
+});
+
+/* op dial */
+var opEl=document.getElementById("op");
+opEl.addEventListener("input",function(){
+  S.op=+opEl.value/100;
+  document.getElementById("opv").textContent=opEl.value+"%";
+  renderAll();
+});
+
+/* ============ spin up: a 5s micro-warclock over this one machine ============ */
+document.getElementById("btnspin").addEventListener("click",function(){
+  if (S.tests<=0||S.testing) return;
+  S.tests--;
+  S.testing={ t:0, dur:5, trace:[], fault:null };
+  msg("SPIN UP — ramping to "+((S.op*100)|0)+"% …");
+});
+function stepTest(dt){
+  var T=S.testing; T.t+=dt;
+  var ramp=Math.min(1,T.t/(T.dur*0.55));
+  var load=S.op*ramp;
+  var m=metrics(load);
+  var noise=(Math.random()-0.5)*0.7 + (Math.random()<0.04?(Math.random()-0.5)*2.4:0); // fat tail
+  var mNow={ out:m.out, margin:m.margin+noise, stab:m.stab+noise*0.25 };
+  T.trace.push(Math.max(0,Math.min(1,mNow.out/14 + (Math.random()-0.5)*0.03)));
+  if (!T.fault && T.t>0.6){
+    if (mNow.margin<0) T.fault={row:1, at:"EXCHANGER", why:"thermal runaway"};
+    else if (mNow.stab<0.02) T.fault={row:2, at:"GOVERNOR", why:"oscillation divergence"};
+  }
+  if (T.fault && T.t<T.dur) T.dur=Math.min(T.dur,T.t+0.7);   // scram cuts the run short
+  if (T.t>=T.dur){
+    var p=parts();
+    if (T.fault){
+      msg("<b class='bad'>SCRAM</b> @ "+T.fault.at+" — "+T.fault.why
+        +".\nfailed at "+((S.op*100)|0)+"% load. derate or refit.");
+      renderGauges(T.fault);
+    } else {
+      var mm=metrics(S.op);
+      var rating=(mm.out*(1+mm.stab)).toFixed(1);
+      if (!S.best || +rating>+S.best) S.best=rating;
+      var disc="";
+      if (resonant(p) && !S.found.res){ S.found.res=true;
+        disc="\n<b class='rq'>◈ HARMONIC LOCK — pulse feed rings clean in the cryo loop. logged.</b>"; }
+      msg("<b class='up'>TEST PASSED</b> — steady at "+((S.op*100)|0)+"%. rating <b>"+rating+"</b>"
+        +" (out "+mm.out.toFixed(1)+" · margin "+mm.margin.toFixed(1)+" · stab "+mm.stab.toFixed(2)+")"+disc);
+    }
+    S.testing=null;
+  }
+}
+
+/* ============ loop ============ */
+function renderAll(){ renderGauges(); renderSchem(); renderDeck(); }
+var last=performance.now();
+function loop(now){
+  var dt=Math.min(0.1,(now-last)/1000); last=now;
+  if (S.testing){ stepTest(dt); renderSchem(); renderDeck(); if(Math.random()<0.3)renderGauges(); }
+  requestAnimationFrame(loop);
+}
+window.addEventListener("resize",function(){ fit(); renderAll(); });
+fit(); renderAll(); requestAnimationFrame(loop);
+</script>
+</body>
+</html>
