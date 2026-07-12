@@ -71,6 +71,7 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 .pick{display:flex;justify-content:space-between;background:var(--bg);border:1px solid var(--line);
   color:var(--ink);font-family:var(--mono);font-size:12px;padding:7px 10px;touch-action:manipulation}
 .pick.sel{border-color:var(--us)}
+.pick.locked{opacity:.32}
 .pick .d{color:var(--dim);font-size:10px}
 .pick:active{background:var(--ink);color:var(--bg)}
 </style>
@@ -99,6 +100,7 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
     <div id="actions">
       <button id="btnreturn" style="display:none">◂ RETURN</button>
       <button id="btnenter" style="display:none">ENTER ▸</button>
+      <button id="btnacq">+ ACQUIRE</button>
       <button id="btnspin">▸ SPIN UP</button>
     </div>
   </section>
@@ -125,6 +127,17 @@ var LIB = {
               {n:"ADAPTIVE",     d:"stable · −10% out",eff:0.9, damp:0.4}],
 };
 var ORDER=["CORE","INJECTOR","COOLANT","EXCHANGER","GOVERNOR"];
+/* inventory: how many of each part you own. key = station+":"+index.
+   fitting a part is free (reusable); you just can't slot what you don't own.
+   start with the tame parts; the hot/rare ones must be acquired. */
+var STOCK={};
+function stockKey(s,k){ return s+":"+k; }
+function initStock(){
+  STOCK={};
+  ORDER.forEach(function(s){ STOCK[stockKey(s,0)]=2; });        // basic tier owned
+  STOCK[stockKey("CORE",1)]=1; STOCK[stockKey("EXCHANGER",1)]=1; // a couple mid parts
+}
+function owned(s,k){ return (STOCK[stockKey(s,k)]||0)>0; }
 var S={ fit:{CORE:0,INJECTOR:0,COOLANT:0,EXCHANGER:0,GOVERNOR:0},
         op:0.5, tests:5, best:null, found:{}, testing:null, pick:null, pickSel:0 };
 
@@ -254,8 +267,9 @@ function openPick(s){
 }
 function renderPick(){
   document.getElementById("picker").innerHTML=LIB[S.pick].map(function(c,k){
-    return '<button class="pick'+(k===S.pickSel?" sel":"")+'" data-k="'+k+'">'
-      +'<span>'+c.n+'</span><span class="d">'+c.d+'</span></button>';
+    var have=STOCK[stockKey(S.pick,k)]||0, own=have>0;
+    return '<button class="pick'+(k===S.pickSel?" sel":"")+(own?"":" locked")+'" data-k="'+k+'"'+(own?"":" disabled")+'>'
+      +'<span>'+c.n+'</span><span class="d">'+c.d+' · '+(own?"×"+have:"—")+'</span></button>';
   }).join("");
 }
 function closePick(commit){
@@ -269,11 +283,23 @@ function closePick(commit){
   renderAll();
 }
 document.getElementById("picker").addEventListener("click",function(e){
-  var b=e.target.closest(".pick"); if(!b)return;
-  S.pickSel=+b.dataset.k; renderPick(); renderGauges(); // live preview? keep committed-only: preview via gauges after ENTER
+  var b=e.target.closest(".pick"); if(!b||b.disabled)return;
+  S.pickSel=+b.dataset.k; renderPick();
 });
 document.getElementById("btnreturn").addEventListener("click",function(){ closePick(false); });
 document.getElementById("btnenter").addEventListener("click",function(){ closePick(true); });
+/* debug: acquire a random locked/scarce part (stands in for salvage/blueprints) */
+document.getElementById("btnacq").addEventListener("click",function(){
+  var pool=[];
+  ORDER.forEach(function(s){ LIB[s].forEach(function(c,k){
+    if ((STOCK[stockKey(s,k)]||0)===0) pool.push([s,k]);
+  }); });
+  if (!pool.length){ msg("inventory full — every part owned."); return; }
+  var pick=pool[(Math.random()*pool.length)|0];
+  STOCK[stockKey(pick[0],pick[1])]=1;
+  msg("<b class='up'>ACQUIRED</b> "+LIB[pick[0]][pick[1]].n+" ("+pick[0]+") — new permutations unlocked.");
+  if (S.pick) renderPick();
+});
 sc.addEventListener("pointerdown",function(e){
   if (S.testing) return;
   var r=sc.getBoundingClientRect(),d=window.devicePixelRatio||1;
@@ -341,7 +367,7 @@ function loop(now){
   requestAnimationFrame(loop);
 }
 window.addEventListener("resize",function(){ fit(); renderAll(); });
-fit(); renderAll(); requestAnimationFrame(loop);
+initStock(); fit(); renderAll(); requestAnimationFrame(loop);
 </script>
 </body>
 </html>
