@@ -42,26 +42,47 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 #trendwrap{height:12%;flex:none;padding:5px 6px}
 #trend{width:100%;height:100%;display:block}
 
-#info{height:28%;flex:none;padding:10px 8px 6px;display:flex;flex-direction:column;gap:5px;overflow:hidden}
+/* mode-driven emphasis: attention geography changes with game state instead
+   of a single static layout serving every moment equally badly */
+#info{height:28%;flex:none;padding:10px 8px 6px;display:flex;flex-direction:column;gap:5px;
+  overflow:hidden;transition:opacity .25s ease,flex-basis .25s ease}
 #stats{display:grid;grid-template-columns:repeat(6,1fr);gap:4px}
 .stat{border:1px solid var(--line);padding:3px 5px;background:var(--bg)}
 .stat .k{color:var(--dim);font-size:8px;letter-spacing:.1em}
 .stat .v{font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .stat.low .v{color:var(--foe)}
-#hangbox{border:1px solid var(--foe);padding:3px 8px;display:none;background:var(--bg)}
-#hangbox.on{display:block}
-#hangbox .t{color:var(--foe);letter-spacing:.08em;font-size:10px}
-#hangbox .rq{color:var(--amber);font-size:10px}
-#lev{height:5px;background:var(--panel);margin-top:3px}
-#lev i{display:block;height:100%;background:var(--foe);width:100%}
 #detail{border-left:3px solid var(--line);padding:1px 8px;color:var(--dim);
   white-space:pre-wrap;font-size:11px;min-height:2.6em}
 #detail b{color:var(--ink);font-weight:400}
 #feed{flex:1;overflow:hidden;font-size:11px;color:var(--dim)}
 #feed .up{color:var(--us)} #feed .down{color:var(--foe)} #feed .sys{color:var(--ink)} #feed .rq{color:var(--amber)}
 #feed div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* HANG mode: telemetry (trend context, stat tiles) recedes — it's not what matters right now */
+#device[data-mode="hang"] #trendwrap{opacity:.3}
+#device[data-mode="hang"] #stats{opacity:.35}
+#device[data-mode="hang"] #info{flex-basis:16%}
+#device[data-mode="hang"] #options{flex:1.6}
+/* BUILDUP mode: the theatre panel itself calls attention — border goes live amber */
+#mapwrap{transition:border-color .3s ease}
+#device[data-mode="buildup"] #mapwrap{border-color:var(--amber)}
 
-#options{flex:1;display:flex;flex-direction:column;gap:5px;padding:10px 8px 8px}
+/* the leverage strip lives where the thumb is — right above the command list,
+   not buried in a calm telemetry panel two thirds of a screen away */
+#hangbox{border:1px solid var(--foe);padding:5px 8px;display:none;background:var(--bg);flex:none}
+#hangbox.on{display:block}
+#hangbox .t{color:var(--foe);letter-spacing:.08em;font-size:11px}
+#hangbox .rq{color:var(--amber);font-size:10px}
+#lev{height:7px;background:var(--panel);margin-top:4px}
+#lev i{display:block;height:100%;background:var(--foe);width:100%;transition:width .1s linear}
+
+/* standby: a persistent, tappable badge — the mechanic is silent no longer */
+#standbybox{display:none;border:1px dashed var(--us);color:var(--us);padding:5px 8px;
+  font-size:11px;letter-spacing:.04em;flex:none;touch-action:manipulation}
+#standbybox.on{display:flex;justify-content:space-between;align-items:center}
+#standbybox .x{color:var(--dim);font-size:10px}
+
+#options{flex:1;display:flex;flex-direction:column;gap:5px;padding:10px 8px 8px;
+  transition:flex .25s ease}
 #optlist{flex:1;display:flex;flex-direction:column;gap:5px;overflow:hidden}
 .opt{display:flex;justify-content:space-between;align-items:center;width:100%;
   background:var(--bg);border:1px solid var(--line);color:var(--ink);
@@ -98,11 +119,12 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
   <div id="trendwrap" class="panel"><span class="ph">TIDE</span><canvas id="trend"></canvas></div>
   <section id="info" class="panel"><span class="ph">TELEMETRY</span>
     <div id="stats"></div>
-    <div id="hangbox"><span class="t" id="hangname"></span> <span class="rq" id="hangreq"></span><div id="lev"><i></i></div></div>
     <div id="detail">tap the map to read a sector.</div>
     <div id="feed"></div>
   </section>
   <section id="options" class="panel"><span class="ph">COMMAND</span>
+    <div id="standbybox"><span id="standbytxt"></span><span class="x">tap to recall</span></div>
+    <div id="hangbox"><span class="t" id="hangname"></span> <span class="rq" id="hangreq"></span><div id="lev"><i></i></div></div>
     <div id="optlist"></div>
     <div id="footer"><button id="btnreturn">◂ RETURN</button><button id="btnenter" disabled>ENTER ▸</button></div>
   </section>
@@ -313,6 +335,8 @@ var CMDS=[
   {id:"MECHA",label:"ADVANCE MECHA",cost:"−1 readiness",needsTarget:true,
    can:function(){return S.mecha>0;},
    run:function(i){S.mecha--;assist(i,0.32,"MECHA");}},
+  /* cost label reads differently depending on whether this targets a live
+     contest (spend now, decaying) or open ground (standby, full value later) */
   {id:"HOLD",label:"HOLD",cost:"free — logged",needsTarget:false,
    can:function(){return true;},
    run:function(){logf("DIRECTOR HOLDS.","sys");mark("HLD",true);
@@ -359,6 +383,15 @@ function renderMap(){
     var gl=S.glyph[i];
     if (gl){ if (S.t<gl.until){ delete S.glyph[i]; }
       else { mctx.fillStyle=gl.color; mctx.fillText(gl.ch,px+CELL/2,py+CELL/2+1); } }
+  }
+  // standby: persistent dashed ring — unlike glyphs, this doesn't expire, so
+  // the mechanic stays visible on the map the whole time it's armed
+  if (S.standby){
+    var sx=S.standby.i%GW, sy=(S.standby.i/GW)|0;
+    mctx.strokeStyle="#d8ff3d"; mctx.lineWidth=2;
+    mctx.setLineDash([4,3]); mctx.lineDashOffset=-now*6;
+    mctx.strokeRect(OX+sx*CELL+2,OY+sy*CELL+2,CELL-4,CELL-4);
+    mctx.setLineDash([]);
   }
   // actionable contest = the ONLY blinking element
   if (S.hang && Math.sin(now*9)>0) box(S.hang.i,"#ff5a2a",3);
@@ -422,9 +455,20 @@ function renderInfo(){
     document.getElementById("hangreq").textContent=S.hang.cs+" "+S.hang.play.call;
     hb.querySelector("#lev i").style.width=((S.hang.left/S.hang.dur)*100)+"%";
   } else hb.classList.remove("on");
+  var sb=document.getElementById("standbybox");
+  if (S.standby){ sb.classList.add("on");
+    document.getElementById("standbytxt").textContent="◈ "+S.standby.cmd+" STANDBY @ "+sname(S.standby.i);
+  } else sb.classList.remove("on");
+  // mode drives layout emphasis: hang > buildup > scouting
+  document.getElementById("device").dataset.mode = S.hang?"hang":S.warn?"buildup":"scouting";
   var d=document.getElementById("detail");
-  if (S.mode==="target") d.innerHTML="<b>"+S.pending.label+"</b> — tap target sector, ENTER to send."
-      +(S.target>=0?" [<b>"+sname(S.target)+"</b>]":"");
+  if (S.mode==="target"){
+    var willStandby = !(S.hang && S.target===S.hang.i);
+    d.innerHTML="<b>"+S.pending.label+"</b> — tap target, ENTER to send.\n"
+      +(willStandby ? "open ground → arms as <b>STANDBY</b>, full value when a play lands nearby."
+                     : "the live contest → commits <b>now</b>, value decaying.")
+      +(S.target>=0?" ["+sname(S.target)+"]":"");
+  }
   else if (S.sel>=0){
     if (S.terr[S.sel]) d.innerHTML="SECTOR <b>"+sname(S.sel)+"</b> // impassable terrain — chokepoint.";
     else { var v=S.grid[S.sel];
@@ -483,6 +527,11 @@ mapC.addEventListener("pointerdown",function(e){
 document.getElementById("again").addEventListener("click",function(){
   document.getElementById("debrief").classList.remove("on");
   feedLines=[]; reset(); renderOptions();
+});
+document.getElementById("standbybox").addEventListener("click",function(){
+  if (!S.standby) return;
+  logf("standby "+S.standby.cmd+" @ "+sname(S.standby.i)+" recalled.","sys");
+  S.standby=null;
 });
 document.getElementById("btnpause").addEventListener("click",function(){
   S.paused=!S.paused;
