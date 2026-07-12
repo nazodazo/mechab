@@ -8,7 +8,7 @@
 /* v3 — two clocks: the theatre grinds on its own; an operative team works
    inside it. You are neither. You are the one they call. */
 :root{
-  --bg:#0a0a0c; --panel:#101014; --ink:#e8e4d8; --dim:#6f6c62; --line:#232329;
+  --bg:#17171b; --panel:#1e1e24; --ink:#e8e4d8; --dim:#8a8778; --line:#34343c;
   --us:#d8ff3d; --foe:#ff5a2a; --amber:#ffb63d;
   --mono:"SF Mono",ui-monospace,"Cascadia Mono","Roboto Mono",Consolas,monospace;
 }
@@ -308,12 +308,12 @@ function renderMap(){
   var px=img.data;
   for (var i=0;i<N;i++){
     var o=i*4, v=S.c[i];
-    if (S.terr[i]){ px[o]=26;px[o+1]=26;px[o+2]=30;px[o+3]=255; continue; }
-    if (v>0.05){ var g=0.16+v*0.7;
+    if (S.terr[i]){ px[o]=46;px[o+1]=46;px[o+2]=53;px[o+3]=255; continue; }
+    if (v>0.05){ var g=0.2+v*0.68;
       px[o]=216*g; px[o+1]=255*g; px[o+2]=61*g; }
-    else if (v<-0.05){ var f=0.16-v*0.7;
+    else if (v<-0.05){ var f=0.2-v*0.68;
       px[o]=255*f; px[o+1]=90*f; px[o+2]=42*f; }
-    else { px[o]=18;px[o+1]=19;px[o+2]=23; }
+    else { px[o]=32;px[o+1]=33;px[o+2]=38; }
     px[o+3]=255;
   }
   bctx.putImageData(img,0,0);
@@ -355,13 +355,13 @@ function renderMap(){
 function mark(label,up){ S.marks.push({k:S.hist.length,label:label,up:up}); }
 function renderTrend(){
   var W=trC.width,H=trC.height,PADR=30;
-  tctx.fillStyle="#0a0a0c"; tctx.fillRect(0,0,W,H);
+  tctx.fillStyle="#17171b"; tctx.fillRect(0,0,W,H);
   var n2=S.hist.length; if (n2<2) return;
   var lo=Infinity,hi=-Infinity;
   for (var k=0;k<n2;k++){ if(S.hist[k]<lo)lo=S.hist[k]; if(S.hist[k]>hi)hi=S.hist[k]; }
   var span=Math.max(0.14,(hi-lo)*1.25), mid=(hi+lo)/2;
   function yOf(v){ return H/2-(v-mid)/span*H*0.86; }
-  tctx.strokeStyle="#232329"; tctx.setLineDash([3,4]);
+  tctx.strokeStyle="#34343c"; tctx.setLineDash([3,4]);
   tctx.beginPath(); tctx.moveTo(0,yOf(0)); tctx.lineTo(W-PADR,yOf(0)); tctx.stroke(); tctx.setLineDash([]);
   tctx.strokeStyle=S.tide>=0?"#d8ff3d":"#ff5a2a"; tctx.lineWidth=2;
   tctx.beginPath();

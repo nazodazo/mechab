@@ -6,7 +6,7 @@
 <title>WORKBENCH // reactor proto</title>
 <style>
 :root{
-  --bg:#0a0a0c; --panel:#101014; --ink:#e8e4d8; --dim:#6f6c62; --line:#232329;
+  --bg:#17171b; --panel:#1e1e24; --ink:#e8e4d8; --dim:#8a8778; --line:#34343c;
   --us:#d8ff3d; --foe:#ff5a2a; --amber:#ffb63d; --navy:#3d5a80;
   --mono:"SF Mono",ui-monospace,"Cascadia Mono","Roboto Mono",Consolas,monospace;
 }
@@ -30,7 +30,7 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 /* 1:1 voxels — width drives the grid, height follows via aspect-ratio,
    auto-flow wraps 15 cells into 3 rows of 5 without forcing a stretch */
 .grow{display:grid;grid-template-columns:repeat(5,1fr);gap:3px}
-.cell{aspect-ratio:1;width:100%;background:#141416;border:1px solid #1c1c21;position:relative}
+.cell{aspect-ratio:1;width:100%;background:#26262c;border:1px solid #313138;position:relative}
 .cell.g{background:var(--us);opacity:.82}
 .cell.n{background:var(--navy);opacity:.75}
 .cell.r{background:var(--foe);opacity:.85}
@@ -220,12 +220,12 @@ function renderReactor(dt){
   coreP += dt*(2+load*7);
   if (dead) scramFlash=Math.min(1,scramFlash+dt*4); else scramFlash=Math.max(0,scramFlash-dt*2);
 
-  sctx.fillStyle="#101014"; sctx.fillRect(0,0,W,H);
+  sctx.fillStyle="#1e1e24"; sctx.fillRect(0,0,W,H);
 
   // station tethers
   ORDER.forEach(function(s){
     var n=NODES[s];
-    sctx.strokeStyle="#232329"; sctx.lineWidth=1.5;
+    sctx.strokeStyle="#34343c"; sctx.lineWidth=1.5;
     sctx.beginPath(); sctx.moveTo(n.x+n.w/2,n.y+n.h/2); sctx.lineTo(cx,cy); sctx.stroke();
   });
 
@@ -282,7 +282,7 @@ function renderReactor(dt){
   // station tabs on top
   ORDER.forEach(function(s){
     var n=NODES[s], hot=S.pick===s;
-    sctx.fillStyle="#0a0a0c"; sctx.fillRect(n.x,n.y,n.w,n.h);
+    sctx.fillStyle="#17171b"; sctx.fillRect(n.x,n.y,n.w,n.h);
     sctx.strokeStyle=hot?"#d8ff3d":"#3a3a42"; sctx.lineWidth=hot?3:1.5;
     sctx.strokeRect(n.x,n.y,n.w,n.h);
     sctx.fillStyle="#6f6c62"; sctx.font=(9*d)+"px monospace"; sctx.textAlign="left";
