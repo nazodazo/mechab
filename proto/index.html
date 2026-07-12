@@ -19,7 +19,7 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
   font-family:var(--mono);font-size:12px;line-height:1.35;
   -webkit-user-select:none;user-select:none;overscroll-behavior:none;display:flex;justify-content:center}
 @supports (height:100dvh){ html,body{height:100dvh} }
-#device{width:100%;max-width:460px;height:100%;display:flex;flex-direction:column;gap:6px;
+#device{width:100%;max-width:460px;height:100%;display:flex;flex-direction:column;gap:9px;
   padding:calc(6px + env(safe-area-inset-top)) 10px calc(8px + env(safe-area-inset-bottom))}
 .panel{border:1px solid var(--line);background:var(--panel);position:relative}
 .panel>.ph{position:absolute;top:-1px;left:8px;transform:translateY(-50%);
@@ -81,6 +81,12 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 .sq .hp{font-size:10px;letter-spacing:.1em}
 .sq .hp b{color:var(--us);font-weight:400} .sq .hp span{color:var(--line)}
 #hostiles{font-size:10px;color:var(--foe);letter-spacing:.06em;padding:1px 2px}
+/* war ledger: fills the idle space with the macro story */
+#ledger{margin-top:auto;border:1px solid var(--line);background:var(--bg);
+  padding:4px 8px;font-size:10px;color:var(--dim);line-height:1.6}
+#ledger b{color:var(--ink);font-weight:400}
+#ledger .up{color:var(--us)} #ledger .bad{color:var(--foe)}
+#ledger .lrow{display:flex;justify-content:space-between}
 
 /* actions: stacked vertically, press-arm-confirm */
 #actions{display:flex;flex-direction:column;gap:5px;flex:none}
@@ -107,7 +113,7 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 </head>
 <body>
 <main id="device">
-  <div id="topbar"><span id="bclock">240</span><span id="phase">THEATRE 7 // LIVE</span>
+  <div id="topbar"><span id="bclock">180</span><span id="phase">THEATRE 7 // LIVE</span>
     <button id="btnpause">⏸</button><span id="tidepct">TIDE —</span></div>
   <div id="mapwrap" class="panel"><span class="ph">THEATRE — tap to designate 141's objective</span><canvas id="map"></canvas></div>
   <div id="trendwrap" class="panel"><span class="ph">TIDE</span><canvas id="trend"></canvas></div>
@@ -152,13 +158,14 @@ function mkTroop(side){
 }
 var S;
 function reset(){
-  S={ t:240, over:false, paused:false, caTimer:0,
+  S={ t:180, over:false, paused:false, caTimer:0,
       c:new Float32Array(N), terr:new Uint8Array(N),
       req:300, cas:3, mat:0,
       tide:0, hist:[], marks:[], receipts:[],
       hotspots:[], hotTimer:0, designated:-1,
       cue:null, arm:[0,0,0,0,0],
       mechaCd:0, mechaUnit:null,
+      kiaB:0, kiaO:0, opsDone:0,
       troops:[],
       squads:[ mkSquad("141",1,true), mkSquad("BULL-6",1,false), mkSquad("RAZOR-2",1,false),
                mkSquad("KESSEL",-1,false), mkSquad("HARROW",-1,false) ],
@@ -249,7 +256,8 @@ function troopTick(tr,dt){
     if (!S.terr[i]&&i>=0&&i<N) S.c[i]=Math.max(-1,Math.min(1,S.c[i]+tr.side*dt*0.55));
     tr.x+=tr.side*dt*0.7; tr.y+=(Math.random()-0.5)*dt*3;
     var danger=Math.max(0,-here*tr.side);
-    if (Math.random()<dt*(0.02+danger*0.10)) tr.dead=3+Math.random()*4;   // fall, respawn
+    if (Math.random()<dt*(0.02+danger*0.10)){ tr.dead=3+Math.random()*4;  // fall, respawn
+      if (tr.side>0) S.kiaB++; else S.kiaO++; }
   }
   tr.y=Math.max(0,Math.min(GH-1,tr.y));
   tr.x=Math.max(0,Math.min(GW-1,tr.x));
@@ -269,6 +277,7 @@ function opFor(sq,obj){
 }
 function opComplete(sq){
   var o=sq.obj, cx=o.x*BW+BW/2, cy=o.y*BW+BW/2;
+  if (sq.side>0) S.opsDone++;
   if (!sq.player){ blast(cx,cy,7,sq.side*0.5); return; }
   switch (sq.op.id){
     case "DA": blast(cx,cy,11,0.85); S.req+=100;
@@ -608,7 +617,22 @@ function renderDeck(){
           : q.phase;
     return '<div class="sq'+(q.player?" mine":"")+'"><span class="nm">'+q.name+'</span>'
       +'<span class="st">'+st2+'</span><span class="hp">'+pips+'</span></div>';
-  }).join("") + '<div id="hostiles">HOSTILE NET: '+hos+' active cell'+(hos===1?"":"s")+'</div>';
+  }).join("") + '<div id="hostiles">HOSTILE NET: '+hos+' active cell'+(hos===1?"":"s")+'</div>'
+  // the war ledger: macro story in the idle space
+  + (function(){
+      var held=0,lost=0;
+      for (var i=0;i<N;i+=5){ if (S.terr[i]) continue;
+        if (S.c[i]>0.5) held++; else if (S.c[i]<-0.5) lost++; }
+      var tot=held+lost||1;
+      var lastOp=S.receipts.length?S.receipts[S.receipts.length-1]:"no operations logged yet";
+      return '<div id="ledger">'
+        +'<div class="lrow"><span>GROUND</span><span><b class="up">'+Math.round(held/tot*100)+'%</b> / <b class="bad">'+Math.round(lost/tot*100)+'%</b></span></div>'
+        +'<div class="lrow"><span>LINE KIA</span><span><b class="up">'+S.kiaB+'</b> / <b class="bad">'+S.kiaO+'</b></span></div>'
+        +'<div class="lrow"><span>OPS DONE</span><span><b>'+S.opsDone+'</b></span></div>'
+        +'<div class="lrow"><span>ELAPSED</span><span><b>'+(180-S.t|0)+'s</b></span></div>'
+        +'<div style="margin-top:2px;border-top:1px dashed var(--line);padding-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+lastOp+'</div>'
+        +'</div>';
+    })();
   var rb=document.getElementById("reqbar");
   if (S.cue){ rb.classList.add("on");
     document.getElementById("reqtxt").textContent="141 REQUESTS "+S.cue.verb+" — "+S.cue.cost;
