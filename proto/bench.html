@@ -22,8 +22,9 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 .panel>.ph{position:absolute;top:-1px;left:8px;transform:translateY(-50%);
   background:var(--bg);padding:0 6px;font-size:9px;letter-spacing:.18em;color:var(--dim)}
 
-/* top 20%: three 5x3 voxel blocks, spaced apart */
-#gauges{height:20%;flex:none;padding:10px 10px 6px;display:flex;gap:14px;align-items:center}
+/* top: three 5x3 voxel blocks + the infomatics readout beneath them */
+#gauges{height:28%;flex:none;padding:10px 10px 8px;display:flex;flex-direction:column;gap:8px}
+#gblocks{flex:1;display:flex;gap:14px;align-items:center;min-height:0}
 .gset{flex:1;display:flex;flex-direction:column;gap:3px;min-width:0;justify-content:center}
 .gset .gl{color:var(--dim);font-size:9px;letter-spacing:.12em;text-align:center}
 /* 1:1 voxels — width drives the grid, height follows via aspect-ratio,
@@ -48,10 +49,11 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
   background:var(--bg);border:2px solid var(--us)}
 #opv{color:var(--us);font-variant-numeric:tabular-nums;width:38px;text-align:right}
 
-/* bottom 20%: infomatics / picker */
+/* middle 52%: workbench only — clean */
+/* bottom 20%: message + picker + actions */
 #deck{height:20%;flex:none;padding:10px 8px 8px;display:flex;flex-direction:column;gap:5px;overflow:hidden}
-#stats{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
-.stat{border:1px solid var(--line);padding:3px 5px;background:var(--bg)}
+#stats{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;flex:none}
+.stat{border:1px solid var(--line);padding:2px 5px;background:var(--bg);text-align:center}
 .stat .k{color:var(--dim);font-size:8px;letter-spacing:.1em}
 .stat .v{font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .stat.low .v{color:var(--foe)}
@@ -65,7 +67,7 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 #actions button[disabled]{opacity:.3}
 #picker{display:none;flex-direction:column;gap:4px;flex:1}
 #picker.on{display:flex}
-#deck.picking #stats,#deck.picking #msg{display:none}
+#deck.picking #msg{display:none}
 .pick{display:flex;justify-content:space-between;background:var(--bg);border:1px solid var(--line);
   color:var(--ink);font-family:var(--mono);font-size:12px;padding:7px 10px;touch-action:manipulation}
 .pick.sel{border-color:var(--us)}
@@ -75,10 +77,13 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 </head>
 <body>
 <main id="device">
-  <section id="gauges" class="panel"><span class="ph">PERFORMANCE ENVELOPE — load 10→90%</span>
-    <div class="gset"><span class="gl">OUTPUT</span><div class="grow" id="g0"></div></div>
-    <div class="gset"><span class="gl">THERMAL</span><div class="grow" id="g1"></div></div>
-    <div class="gset"><span class="gl">STABILITY</span><div class="grow" id="g2"></div></div>
+  <section id="gauges" class="panel"><span class="ph">ENVELOPE — load 10→90%</span>
+    <div id="gblocks">
+      <div class="gset"><span class="gl">OUTPUT</span><div class="grow" id="g0"></div></div>
+      <div class="gset"><span class="gl">THERMAL</span><div class="grow" id="g1"></div></div>
+      <div class="gset"><span class="gl">STABILITY</span><div class="grow" id="g2"></div></div>
+    </div>
+    <div id="stats"></div>
   </section>
 
   <section id="bench" class="panel"><span class="ph">WORKBENCH — REACTOR MK I</span>
@@ -89,7 +94,6 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
   </section>
 
   <section id="deck" class="panel"><span class="ph">DECK</span>
-    <div id="stats"></div>
     <div id="msg">tap a station on the schematic to refit it.\nSPIN UP costs 1 test article.</div>
     <div id="picker"></div>
     <div id="actions">
