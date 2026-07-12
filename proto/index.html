@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
-<title>WARCLOCK // proto v2</title>
+<title>WARCLOCK // proto v3</title>
 <style>
-/* WARCLOCK proto v2 — dashboard instrument panel. Fixed viewport, zero scroll.
-   heatmap ~30% / trendline ~12% / infomatics ~28% / command rest. */
+/* v3 — two clocks: the theatre grinds on its own; an operative team works
+   inside it. You are neither. You are the one they call. */
 :root{
   --bg:#0a0a0c; --panel:#101014; --ink:#e8e4d8; --dim:#6f6c62; --line:#232329;
   --us:#d8ff3d; --foe:#ff5a2a; --amber:#ffb63d;
@@ -16,90 +16,58 @@
 html,body{height:100%;overflow:hidden}
 body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
   font-family:var(--mono);font-size:12px;line-height:1.35;
-  -webkit-user-select:none;user-select:none;overscroll-behavior:none;
-  display:flex;justify-content:center}
+  -webkit-user-select:none;user-select:none;overscroll-behavior:none;display:flex;justify-content:center}
 @supports (height:100dvh){ html,body{height:100dvh} }
-
 #device{width:100%;max-width:460px;height:100%;display:flex;flex-direction:column;gap:6px;
   padding:calc(6px + env(safe-area-inset-top)) 10px calc(8px + env(safe-area-inset-bottom))}
-
-/* dashboard panels: every section is a bordered instrument with a micro-header */
 .panel{border:1px solid var(--line);background:var(--panel);position:relative}
-.panel > .ph{position:absolute;top:-1px;left:8px;transform:translateY(-50%);
+.panel>.ph{position:absolute;top:-1px;left:8px;transform:translateY(-50%);
   background:var(--bg);padding:0 6px;font-size:9px;letter-spacing:.18em;color:var(--dim)}
 
 #topbar{display:flex;gap:8px;align-items:baseline;color:var(--dim);font-size:11px;
   letter-spacing:.08em;padding:0 2px}
 #bclock{color:var(--ink);font-variant-numeric:tabular-nums}
 #phase{flex:1;text-align:center;overflow:hidden;white-space:nowrap}
-#tidepct{font-variant-numeric:tabular-nums}
 #btnpause{background:transparent;border:1px solid var(--line);color:var(--ink);
   font-family:var(--mono);font-size:11px;padding:2px 10px;touch-action:manipulation}
 #btnpause.on{border-color:var(--amber);color:var(--amber)}
+#tidepct{font-variant-numeric:tabular-nums}
 
-#mapwrap{height:30%;flex:none;padding:6px}
+#mapwrap{height:34%;flex:none;padding:6px}
 #map{width:100%;height:100%;display:block;image-rendering:pixelated;touch-action:none}
-#trendwrap{height:12%;flex:none;padding:5px 6px}
+#trendwrap{height:10%;flex:none;padding:5px 6px}
 #trend{width:100%;height:100%;display:block}
 
-/* mode-driven emphasis: attention geography changes with game state instead
-   of a single static layout serving every moment equally badly */
-#info{height:28%;flex:none;padding:10px 8px 6px;display:flex;flex-direction:column;gap:5px;
-  overflow:hidden;transition:opacity .25s ease,flex-basis .25s ease}
-#stats{display:grid;grid-template-columns:repeat(6,1fr);gap:4px}
-.stat{border:1px solid var(--line);padding:3px 5px;background:var(--bg)}
-.stat .k{color:var(--dim);font-size:8px;letter-spacing:.1em}
-.stat .v{font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap}
+/* bottom: stats LEFT, cues CENTER, buttons under */
+#deck{flex:1;padding:10px 8px 8px;display:flex;flex-direction:column;gap:6px;overflow:hidden}
+#deckmain{flex:1;display:flex;gap:8px;min-height:0}
+#stats{width:31%;flex:none;display:flex;flex-direction:column;gap:4px}
+.stat{border:1px solid var(--line);padding:3px 7px;background:var(--bg);
+  display:flex;justify-content:space-between;align-items:baseline}
+.stat .k{color:var(--dim);font-size:9px;letter-spacing:.1em}
+.stat .v{font-size:13px;font-variant-numeric:tabular-nums}
 .stat.low .v{color:var(--foe)}
-#detail{border-left:3px solid var(--line);padding:1px 8px;color:var(--dim);
-  white-space:pre-wrap;font-size:11px;min-height:2.6em}
-#detail b{color:var(--ink);font-weight:400}
-#feed{flex:1;overflow:hidden;font-size:11px;color:var(--dim)}
-#feed .up{color:var(--us)} #feed .down{color:var(--foe)} #feed .sys{color:var(--ink)} #feed .rq{color:var(--amber)}
-#feed div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-/* HANG mode: telemetry (trend context, stat tiles) recedes — it's not what matters right now */
-#device[data-mode="hang"] #trendwrap{opacity:.3}
-#device[data-mode="hang"] #stats{opacity:.35}
-#device[data-mode="hang"] #info{flex-basis:16%}
-#device[data-mode="hang"] #options{flex:1.6}
-/* BUILDUP mode: the theatre panel itself calls attention — border goes live amber */
-#mapwrap{transition:border-color .3s ease}
-#device[data-mode="buildup"] #mapwrap{border-color:var(--amber)}
+#cues{flex:1;display:flex;flex-direction:column;gap:3px;overflow:hidden;font-size:11px}
+#cues .cue{color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#cues .cue.team{color:var(--ink)}
+#cues .cue.req{color:var(--amber)}
+#cues .cue.up{color:var(--us)} #cues .cue.bad{color:var(--foe)}
+#reqbar{border:1px solid var(--amber);padding:4px 8px;display:none;flex:none}
+#reqbar.on{display:block}
+#reqbar .t{color:var(--amber);font-size:11px}
+#reqwin{height:5px;background:var(--panel);margin-top:3px}
+#reqwin i{display:block;height:100%;background:var(--amber);width:100%}
 
-/* the leverage strip lives where the thumb is — right above the command list,
-   not buried in a calm telemetry panel two thirds of a screen away */
-#hangbox{border:1px solid var(--foe);padding:5px 8px;display:none;background:var(--bg);flex:none}
-#hangbox.on{display:block}
-#hangbox .t{color:var(--foe);letter-spacing:.08em;font-size:11px}
-#hangbox .rq{color:var(--amber);font-size:10px}
-#lev{height:7px;background:var(--panel);margin-top:4px}
-#lev i{display:block;height:100%;background:var(--foe);width:100%;transition:width .1s linear}
-
-/* standby: a persistent, tappable badge — the mechanic is silent no longer */
-#standbybox{display:none;border:1px dashed var(--us);color:var(--us);padding:5px 8px;
-  font-size:11px;letter-spacing:.04em;flex:none;touch-action:manipulation}
-#standbybox.on{display:flex;justify-content:space-between;align-items:center}
-#standbybox .x{color:var(--dim);font-size:10px}
-
-#options{flex:1;display:flex;flex-direction:column;gap:5px;padding:10px 8px 8px;
-  transition:flex .25s ease}
-#optlist{flex:1;display:flex;flex-direction:column;gap:5px;overflow:hidden}
-.opt{display:flex;justify-content:space-between;align-items:center;width:100%;
+/* one-press arms, second press fires. layout never changes. */
+#actions{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;flex:none}
+#actions button{padding:12px 4px;font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;
   background:var(--bg);border:1px solid var(--line);color:var(--ink);
-  font-family:var(--mono);font-size:13px;padding:8px 12px;text-align:left;
-  touch-action:manipulation;cursor:pointer}
-.opt:active{background:var(--ink);color:var(--bg)}
-.opt[disabled]{opacity:.3}
-.opt .cost{color:var(--dim);font-size:10px}
-.opt.rec{border-color:var(--amber)}
-.opt.rec .cost{color:var(--amber)}
-#footer{display:none;gap:6px}
-#footer.on{display:flex}
-#footer button{flex:1;padding:12px;font-family:var(--mono);font-size:13px;letter-spacing:.14em;
-  background:var(--bg);border:1px solid var(--line);color:var(--ink);touch-action:manipulation}
-#btnenter{border-color:var(--us);color:var(--us)}
-#btnenter[disabled]{opacity:.3}
-#footer button:active{background:var(--ink);color:var(--bg)}
+  touch-action:manipulation;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#actions button:active{background:var(--ink);color:var(--bg)}
+#actions button[disabled]{opacity:.28}
+#actions button.armed{border-color:var(--us);color:var(--us)}
+#actions button.hot{border-color:var(--amber);color:var(--amber)}
+#actions button.togon{border-color:var(--us);color:var(--us)}
 
 #debrief{position:absolute;inset:0;background:rgba(10,10,12,.97);display:none;
   flex-direction:column;padding:40px 24px;gap:10px;z-index:5}
@@ -113,441 +81,385 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 </head>
 <body>
 <main id="device">
-  <div id="topbar"><span id="bclock">90.0</span><span id="phase">THEATRE 7 // LIVE</span>
+  <div id="topbar"><span id="bclock">240</span><span id="phase">THEATRE 7 // LIVE</span>
     <button id="btnpause">⏸</button><span id="tidepct">—</span></div>
-  <div id="mapwrap" class="panel"><span class="ph">THEATRE</span><canvas id="map"></canvas></div>
+  <div id="mapwrap" class="panel"><span class="ph">THEATRE — tap to designate the team's next objective</span><canvas id="map"></canvas></div>
   <div id="trendwrap" class="panel"><span class="ph">TIDE</span><canvas id="trend"></canvas></div>
-  <section id="info" class="panel"><span class="ph">TELEMETRY</span>
-    <div id="stats"></div>
-    <div id="detail">tap the map to read a sector.</div>
-    <div id="feed"></div>
-  </section>
-  <section id="options" class="panel"><span class="ph">COMMAND</span>
-    <div id="standbybox"><span id="standbytxt"></span><span class="x">tap to recall</span></div>
-    <div id="hangbox"><span class="t" id="hangname"></span> <span class="rq" id="hangreq"></span><div id="lev"><i></i></div></div>
-    <div id="optlist"></div>
-    <div id="footer"><button id="btnreturn">◂ RETURN</button><button id="btnenter" disabled>ENTER ▸</button></div>
+  <section id="deck" class="panel"><span class="ph">OPERATIONS</span>
+    <div id="reqbar"><span class="t" id="reqtxt"></span><div id="reqwin"><i></i></div></div>
+    <div id="deckmain">
+      <div id="stats"></div>
+      <div id="cues"></div>
+    </div>
+    <div id="actions">
+      <button id="b0"></button><button id="b1"></button><button id="b2"></button><button id="b3"></button>
+    </div>
   </section>
   <div id="debrief"><h2 id="verdict">—</h2><div id="receipts"></div><button id="again">RE-RUN THEATRE</button></div>
 </main>
 
 <script>
 "use strict";
-/* ============ grid geometry: square cells fitted to the canvas ============ */
-var mapC=document.getElementById("map"), trC=document.getElementById("trend");
-var mctx=mapC.getContext("2d"), tctx=trC.getContext("2d");
-var GW, GH=9, CELL, OX, OY;
-function fit(c){ var r=c.getBoundingClientRect(), d=window.devicePixelRatio||1;
-  c.width=Math.round(r.width*d); c.height=Math.round(r.height*d); }
-function gridFit(){
-  CELL = Math.floor(mapC.height/GH);
-  GW   = Math.floor(mapC.width/CELL);
-  OX   = ((mapC.width - GW*CELL)/2)|0;
-  OY   = ((mapC.height - GH*CELL)/2)|0;
-}
+/* ================= fine-grain front: typed arrays + ImageData ================= */
+var GW=192, GH=88, N=GW*GH;
+var mapC=document.getElementById("map"), mctx=mapC.getContext("2d");
+var trC=document.getElementById("trend"), tctx=trC.getContext("2d");
+var buf=document.createElement("canvas"); buf.width=GW; buf.height=GH;
+var bctx=buf.getContext("2d"), img=bctx.createImageData(GW,GH);
+function fit(c){ var r=c.getBoundingClientRect(),d=window.devicePixelRatio||1;
+  c.width=Math.round(r.width*d); c.height=Math.round(r.height*d);
+  c.getContext("2d").imageSmoothingEnabled=false; }
 
-/* ============ sim state ============ */
-var S, PRESSURE=0.10;                 // build pressure: the theatre leans YOUR way by default
+var S;
 function reset(){
-  S = {
-    t:90, over:false,
-    grid:new Float32Array(GW*GH),
-    terr:new Uint8Array(GW*GH),       // 1 = impassable terrain (chokepoint maker)
-    glyph:{},                         // i -> {ch, until, color}
-    troops:1200, mecha:3, cas:4, req:400,
-    warn:null, hang:null,             // enemy play lifecycle: buildup -> hang -> resolve
-    standby:null,                     // pre-positioned assist: {i, cmd, base}
-    paused:false,
-    sel:-1, tide:0, hist:[], marks:[],
-    mode:"root", pending:null, target:-1,
-    receipts:[], nextPlay: 5+Math.random()*3, lastTick:0, mom:0,
+  S={ t:240, over:false, paused:false,
+      c:new Float32Array(N), terr:new Uint8Array(N),
+      req:300, cas:3, aggression:0.0016,
+      tide:0, hist:[], marks:[], receipts:[],
+      hotspots:[], hotTimer:0,
+      designated:-1,                        // block index the player tapped
+      team:{ hp:4, morale:1, phase:"STAGING", pt:4, x:4, y:GH/2, obj:null, prog:0, heat:0, urge:false },
+      cue:null,                             // active request {label,act,left,dur}
+      arm:[0,0,0,0],                        // per-button confirm timers
   };
   genTerrain();
   for (var y=0;y<GH;y++) for (var x=0;x<GW;x++){
     var i=y*GW+x; if (S.terr[i]) continue;
-    var f=x/(GW-1);
-    S.grid[i]=Math.max(-1,Math.min(1,(0.5-f)*2.2+(Math.random()-0.5)*0.5));
+    S.c[i] = x<5 ? 0.95 : x>=GW-5 ? -0.95 : 0;     // forces start at the edges
   }
-  logf("THEATRE 7 OPEN — your build holds the line. watch for plays.","sys");
+  cues.length=0;
+  cue("THEATRE 7 OPEN — forces deploying from the lines.","team");
+  cue("141 staging. tap the map to designate their objective.","req");
 }
-/* generative terrain: ridge random-walks leave impassable cells → chokepoints */
 function genTerrain(){
-  var ridges=2+((Math.random()*2)|0);
-  for (var r=0;r<ridges;r++){
-    var x=((GW*0.3)+Math.random()*GW*0.4)|0, y=(Math.random()*GH)|0;
-    var len=4+((Math.random()*7)|0);
-    for (var s=0;s<len;s++){
-      if (x>=0&&x<GW&&y>=0&&y<GH) S.terr[y*GW+x]=1;
+  for (var r=0;r<5;r++){
+    var x=(GW*0.25+Math.random()*GW*0.5)|0, y=(Math.random()*GH)|0, len=14+(Math.random()*30|0);
+    for (var s2=0;s2<len;s2++){
+      for (var dy=-1;dy<=1;dy++){ var yy=y+dy;
+        if (x>=0&&x<GW&&yy>=0&&yy<GH) S.terr[yy*GW+x]=1; }
       var d=Math.random();
-      if (d<0.4) y++; else if (d<0.8) y--; else x+=Math.random()<0.5?1:-1;
+      if (d<0.42) y++; else if (d<0.84) y--; else x+=Math.random()<0.5?1:-1;
     }
   }
 }
-function tideCalc(){                   // global mean + frontier mean: battles move the line
-  var g=0,fn=0,fs=0,n=0;
-  for (var i=0;i<GW*GH;i++){
-    if (S.terr[i]) continue;
-    g+=S.grid[i]; n++;
-    if (Math.abs(S.grid[i])<0.5){ fs+=S.grid[i]; fn++; }
-  }
-  return 0.45*(g/n) + 0.55*(fn?fs/fn:0);
-}
-function contested(i){ return !S.terr[i] && Math.abs(S.grid[i])<0.35; }
-function frontier(){ var a=[]; for (var i=0;i<GW*GH;i++) if (contested(i)) a.push(i); return a; }
-function choky(i){                     // prefers cells hugging terrain — chokepoints
-  var x=i%GW,y=(i/GW)|0,c=0;
-  [[1,0],[-1,0],[0,1],[0,-1]].forEach(function(o){
-    var nx=x+o[0],ny=y+o[1];
-    if (nx<0||nx>=GW||ny<0||ny>=GH||S.terr[ny*GW+nx]) c++;
-  });
-  return c;
-}
-function fat(){ var r=Math.random(); return r<0.05?4:r<0.15?2:1; }
-function clampCell(i,d){ if(!S.terr[i]) S.grid[i]=Math.max(-1,Math.min(1,S.grid[i]+d)); }
-function bleed(i,d){
-  var x=i%GW,y=(i/GW)|0;
-  [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,-1],[1,-1],[-1,1]].forEach(function(o){
-    var nx=x+o[0],ny=y+o[1];
-    if (nx<0||nx>=GW||ny<0||ny>=GH) return;
-    clampCell(ny*GW+nx,d*0.55);
-  });
-}
-function setGlyph(i,ch,color,ttl){ S.glyph[i]={ch:ch,color:color,until:S.t-ttl}; }
-function sname(i){ return String.fromCharCode(65+((i/GW)|0))+"-"+(i%GW+1); }
 
-/* ============ enemy plays: warn (anticipate) -> hang (act) -> resolve ============ */
-var PLAYS=[
-  {name:"FLANKING ARMOUR",  counter:"CAS",    call:"requests CAS on armour"},
-  {name:"INFANTRY SURGE",   counter:"COMMIT", call:"requests reinforcement"},
-  {name:"HOSTILE MECHA",    counter:"MECHA",  call:"requests mecha support"},
-  {name:"ARTY ENCIRCLEMENT",counter:"CAS",    call:"requests counter-battery CAS"},
-  {name:"NIGHT INFILTRATION",counter:"COMMIT",call:"requests line reinforcement"},
+/* CA step: sampled relaxation + edge-fed expansion + adversarial bias.
+   ~6k random cells per tick keeps it organic and cheap (typed arrays). */
+function caStep(){
+  var A=S.aggression;
+  for (var k=0;k<6000;k++){
+    var i=(Math.random()*N)|0; if (S.terr[i]) continue;
+    var x=i%GW, y=(i/GW)|0;
+    var l=x>0&&!S.terr[i-1]?S.c[i-1]:S.c[i], r=x<GW-1&&!S.terr[i+1]?S.c[i+1]:S.c[i];
+    var u=y>0&&!S.terr[i-GW]?S.c[i-GW]:S.c[i], d=y<GH-1&&!S.terr[i+GW]?S.c[i+GW]:S.c[i];
+    var avg=(l+r+u+d)/4;
+    var v=S.c[i] + 0.22*(avg-S.c[i]) + (Math.random()-0.5)*0.02 - A;
+    if (x<3) v=Math.max(v,0.9); if (x>=GW-3) v=Math.min(v,-0.9);   // supply at the edges
+    S.c[i]=v>1?1:v<-1?-1:v;
+  }
+}
+/* hotspots: 8x8 blocks; only a block that clots into a real mass gets a mark.
+   scattered pixels imply nothing — that's the point. */
+var BW=8, BX=GW/BW, BY=GH/BW;
+function findHotspots(){
+  var hs=[];
+  for (var by=0;by<BY;by++) for (var bx=0;bx<BX;bx++){
+    var cont=0, sum=0, n2=0;
+    for (var y=0;y<BW;y++) for (var x=0;x<BW;x++){
+      var i=(by*BW+y)*GW+(bx*BW+x);
+      if (S.terr[i]) continue; n2++;
+      sum+=S.c[i];
+      if (Math.abs(S.c[i])<0.35) cont++;
+    }
+    if (!n2) continue;
+    var frac=cont/n2;
+    if (frac>0.55) hs.push({b:by*BX+bx, x:bx, y:by, frac:frac, mean:sum/n2});
+  }
+  hs.sort(function(a,b){return b.frac-a.frac;});
+  S.hotspots=hs.slice(0,6);
+}
+function tideCalc(){
+  var g=0,n2=0;
+  for (var i=0;i<N;i+=7){ if (S.terr[i]) continue; g+=S.c[i]; n2++; }
+  return g/n2;
+}
+
+/* ================= the team: their clock, not yours ================= */
+var T_NAMES=["GHOST","VIPER","SABLE","ONYX"];
+function teamTick(dt){
+  var T=S.team;
+  if (T.phase==="DOWN"){ T.pt-=dt; if (T.pt<=0){ T.phase="STAGING"; T.pt=4; T.hp=Math.min(4,T.hp+2);
+      cue("141 refit — restaged and ready.","team"); } return; }
+  if (T.phase==="STAGING"){ T.pt-=dt;
+    if (T.pt<=0){ T.obj=pickObjective(); if(!T.obj){T.pt=3;return;}
+      T.phase="INSERT"; cue("141 inserting toward "+bname(T.obj),"team"); } return; }
+  if (T.phase==="INSERT"){
+    var tx=T.obj.x*BW+BW/2, ty=T.obj.y*BW+BW/2;
+    var dx=tx-T.x, dy=ty-T.y, dist=Math.hypot(dx,dy);
+    if (dist<2){ T.phase="WORK"; T.prog=0; T.heat=0;
+      cue("141 on objective — going to work.","team"); return; }
+    var sp=(T.urge?9:6)*dt; T.x+=dx/dist*sp; T.y+=dy/dist*sp;
+    if (T.urge) T.heat+=dt*1.2;
+    return;
+  }
+  if (T.phase==="WORK"){
+    T.prog += dt*(T.urge?11:6.5)*T.morale;
+    T.heat += dt*(T.urge?2.6:1.1) * (1+localHostility(T)*1.6);
+    if (!S.cue && Math.random()<dt*0.35) raiseRequest();
+    if (T.heat>7 && Math.random()<dt*0.5) teamHit("taking fire on the objective");
+    if (T.prog>=100){
+      var bi=T.obj.b, cx2=T.obj.x*BW+BW/2, cy2=T.obj.y*BW+BW/2;
+      blast(cx2,cy2,14,0.9);
+      S.req+=120; mark("141",true);
+      S.receipts.push("◈ 141 objective "+bname(T.obj)+" — <b>EXECUTED</b>. front broken locally.");
+      cue("141: objective done. exfiltrating.","up");
+      S.cue=null; T.phase="EXFIL";
+    }
+    return;
+  }
+  if (T.phase==="EXFIL"){
+    var dx2=4-T.x, dy2=GH/2-T.y, d2=Math.hypot(dx2,dy2);
+    if (d2<3){ T.phase="STAGING"; T.pt=6; cue("141 home. restaging.","team"); return; }
+    T.x+=dx2/d2*7*dt; T.y+=dy2/d2*7*dt;
+  }
+}
+function pickObjective(){
+  if (S.designated>=0){
+    var bx=S.designated%BX, by=(S.designated/BX)|0;
+    var hs={b:S.designated,x:bx,y:by,frac:1};
+    S.designated=-1; return hs;
+  }
+  var deep=S.hotspots.filter(function(h){return h.mean<0.1;});
+  return deep[0]||S.hotspots[0]||null;
+}
+function localHostility(T){
+  var i=((T.y|0)*GW+(T.x|0)); if (i<0||i>=N) return 0;
+  return Math.max(0,-S.c[i]);
+}
+function blast(cx,cy,rad,amt){
+  for (var y=Math.max(0,cy-rad|0);y<Math.min(GH,cy+rad);y++)
+    for (var x=Math.max(0,cx-rad|0);x<Math.min(GW,cx+rad);x++){
+      var dd=Math.hypot(x-cx,y-cy); if (dd>rad) continue;
+      var i=y*GW+x; if (S.terr[i]) continue;
+      S.c[i]=Math.min(1,S.c[i]+amt*(1-dd/rad));
+    }
+}
+function teamHit(why){
+  S.team.hp--; S.team.heat=Math.max(0,S.team.heat-3);
+  cue("141: man down — "+why+".","bad");
+  S.receipts.push("▼ 141 casualty — "+why);
+  if (S.team.hp<=0){ S.team.phase="DOWN"; S.team.pt=20; S.team.morale=Math.max(0.5,S.team.morale-0.2);
+    S.cue=null; cue("141 COMBAT INEFFECTIVE — extraction under fire.","bad");
+    S.receipts.push("██ 141 wiped to extraction — 20s refit, morale down.");
+  }
+}
+/* requests: the team asks; you answer (or don't). the window is theirs. */
+var REQS=[
+  {label:"APPROVE SABOTAGE", verb:"SABOTAGE", cost:"−80 req", can:function(){return S.req>=80;},
+   yes:function(){ S.req-=80; S.team.prog+=30; cue("141: charges set — progress jumped.","up"); },
+   no:function(){ cue("141: copy. doing it the slow way.","team"); }},
+  {label:"APPROVE RIG",      verb:"RIG",      cost:"−60 req", can:function(){return S.req>=60;},
+   yes:function(){ S.req-=60; S.team.heat=Math.max(0,S.team.heat-4); cue("141: decoys rigged — heat off.","up"); },
+   no:function(){ S.team.heat+=1.5; cue("141: negative copy. staying loud.","team"); }},
+  {label:"CAS DANGER-CLOSE", verb:"CAS",      cost:"−1 cas",  can:function(){return S.cas>0;},
+   yes:function(){ S.cas--; blast(S.team.x,S.team.y,9,0.5); S.team.heat=0; cue("CAS in — danger close, front pushed.","up"); },
+   no:function(){ cue("141: no air. breaking contact ourselves.","team"); S.team.prog=Math.max(0,S.team.prog-15); }},
 ];
-var CALLSIGNS=["L2","K7","V3","R9"];
-function openWarn(){
-  var f=frontier(); if(!f.length){ S.nextPlay=4; return; }
-  f.sort(function(a,b){ return choky(b)-choky(a); });         // enemy hits chokepoints
-  var i=f[(Math.random()*Math.min(4,f.length))|0];
-  var p=PLAYS[(Math.random()*PLAYS.length)|0];
-  // BUILDUP, not pop-up: 8-12s of visible massing before the contest opens.
-  // A map-reader sees it coming; the radio is only the first hint.
-  S.warn={ i:i, play:p, opens:8+Math.random()*4, tick:0,
-           cs:CALLSIGNS[(Math.random()*CALLSIGNS.length)|0] };
-  setGlyph(i,"?","#ffb63d",S.warn.opens);
-  logf(S.warn.cs+": movement massing near "+sname(i)+".","rq");
-}
-function openHang(){
-  var w=S.warn; S.warn=null;
-  var dur=4+Math.random()*1.5;
-  // the radio CALLS an assist — but it's a request, not the answer key (~25% wrong)
-  var req=w.play.counter;
-  if (Math.random()<0.25){
-    var alts=["CAS","COMMIT","MECHA"].filter(function(c){return c!==req;});
-    req=alts[(Math.random()*alts.length)|0];
-  }
-  S.hang={ i:w.i, play:w.play, dur:dur, left:dur, committed:0, used:null, cs:w.cs, req:req };
-  setGlyph(w.i,"X","#ff5a2a",dur);
-  logf("◈ "+w.play.name+" @ "+sname(w.i)+" — "+w.cs+" requests "+req,"rq");
-  // a pre-positioned standby on (or beside) the cell pays off at full strength
-  if (S.standby && Math.max(Math.abs(S.standby.i%GW - w.i%GW), Math.abs(((S.standby.i/GW)|0)-((w.i/GW)|0)))<=1){
-    S.hang.committed += S.standby.base*1.5;
-    S.hang.used = S.standby.cmd;
-    logf("▸ standby "+S.standby.cmd+" engages — pre-positioned.","up");
-    S.receipts.push("▸ STANDBY "+S.standby.cmd+" @ "+sname(S.standby.i)+" — <b>anticipated the play</b> (×1.5)");
-    S.standby=null;
-  }
-}
-function resolveHang(){
-  var h=S.hang; S.hang=null; S.nextPlay=6+Math.random()*5;
-  var before=S.tide, out, d;
-  if (h.committed>0){
-    var right = h.used===h.play.counter;
-    d=(0.35+h.committed)*(right?1.7:0.8)*fat();
-    out = right?"COUNTERED":"BLUNTED";
-    var radioNote = h.req!==h.play.counter?" — radio called "+h.req+", truth was "+h.play.counter:"";
-    S.receipts.push("◈ "+h.play.name+" @ "+sname(h.i)+" — <b>"+out+"</b> with "+h.used
-      +(right?" (correct assist)":" (wrong assist — "+h.play.counter+" answers "+h.play.name+")")+radioNote);
-  } else {
-    // no intervention: the build fights its own battle. Not adversarial — but plays probe it.
-    if (Math.random() < 0.55+PRESSURE){ d=0.18*fat(); out="HELD BY DOCTRINE";
-      S.receipts.push("◈ "+h.play.name+" @ "+sname(h.i)+" — <b>held</b> unaided (build credit)"); }
-    else { d=-0.45*fat(); out="GROUND LOST"; S.troops=Math.max(0,S.troops-120);
-      S.receipts.push("◈ "+h.play.name+" @ "+sname(h.i)+" — <b>ground lost</b>, "+h.cs+" mauled"); }
-  }
-  clampCell(h.i,d); bleed(h.i,d*0.8);
-  setGlyph(h.i, d>=0?"+":"!", d>=0?"#d8ff3d":"#ff5a2a", 3);
-  mark(h.play.name.split(" ")[0], d>=0);
-  logf((d>=0?"▲ ":"▼ ")+h.play.name+" — "+out,(d>=0?"up":"down"));
+function raiseRequest(){
+  var pool=REQS.filter(function(r){return r.can();});
+  if (!pool.length) return;
+  var r=pool[(Math.random()*pool.length)|0];
+  S.cue={ r:r, left:6, dur:6 };
+  cue("141 requests: "+r.verb+" ("+r.cost+")","req");
 }
 
-/* ============ warclock ============ */
+/* ================= warclock ================= */
 function advance(dt){
-  if (S.over || S.paused) return;
-  S.t-=dt; S.lastTick+=dt;
-  S.req+=dt*captured()*0.4;
-  if (S.lastTick>=0.6){ S.lastTick=0; microTick(); }
-
-  if (S.warn){
-    S.warn.opens-=dt; S.warn.tick+=dt;
-    if (S.warn.tick>=1.2){ S.warn.tick=0;          // visible massing: pressure leaks in
-      clampCell(S.warn.i,-0.06); bleed(S.warn.i,-0.03);
-      setGlyph(S.warn.i,"?","#ffb63d",S.warn.opens); }
-    if (S.warn.opens<=0) openHang();
-  }
-  else if (S.hang){ S.hang.left-=dt; if (S.hang.left<=0) resolveHang(); }
-  else { S.nextPlay-=dt; if (S.nextPlay<=0) openWarn(); }
-
-  var t0=S.tide; S.tide=tideCalc(); S.hist.push(S.tide);
-  S.mom=S.mom*0.95+(S.tide-t0)*0.05;
-  if (S.t<=0 || Math.abs(S.tide)>0.9) end();
-}
-function captured(){ var n=0; for (var i=0;i<GW*GH;i++) if (!S.terr[i]&&S.grid[i]>0.5) n++; return n; }
-function microTick(){
-  var f=frontier(); if(!f.length) return;
-  var i=f[(Math.random()*f.length)|0];
-  var d=(PRESSURE+(Math.random()-0.5)*0.16)*fat();
-  clampCell(i,d); bleed(i,d*0.25);
-  if (Math.abs(d)>0.18){
-    setGlyph(i, d>0?"+":"!", d>0?"#d8ff3d":"#ff5a2a", 2);
-    if (d<0) S.troops=Math.max(0,S.troops-((Math.random()*30)|0));
-  }
+  if (S.over||S.paused) return;
+  S.t-=dt;
+  S.aggression=0.0016+ (1-S.t/240)*0.0022;          // theatre presses harder late
+  caStep();
+  S.hotTimer+=dt; if (S.hotTimer>0.6){ S.hotTimer=0; findHotspots(); }
+  teamTick(dt);
+  if (S.cue){ S.cue.left-=dt;
+    if (S.cue.left<=0){ S.cue.r.no(); S.cue=null; } }
+  S.req+=dt*2;
+  S.tide=tideCalc(); S.hist.push(S.tide);
+  if (S.t<=0 || Math.abs(S.tide)>0.55) end();
 }
 function end(){
   S.over=true;
-  var v=S.tide>0.35?"LANDSLIDE — THEATRE TAKEN":S.tide>0?"MARGINAL HOLD":
-        S.tide>-0.35?"MARGINAL LOSS":"COLLAPSE";
+  var v=S.tide>0.25?"LANDSLIDE — THEATRE TAKEN":S.tide>0?"MARGINAL HOLD":
+        S.tide>-0.25?"MARGINAL LOSS":"COLLAPSE";
   document.getElementById("verdict").textContent=v;
   document.getElementById("receipts").innerHTML=
-    "FINAL TIDE "+(S.tide*100).toFixed(0)+"%\nTROOPS "+S.troops+" · REQ "+(S.req|0)
-    +" · CAS "+S.cas+" · MECHA "+S.mecha
-    +"\n\n"+(S.receipts.length?S.receipts.join("\n"):"(no plays resolved)");
+    "FINAL TIDE "+(S.tide*100).toFixed(0)+"% · REQ "+(S.req|0)+" · CAS "+S.cas
+    +" · 141 "+S.team.hp+"/4\n\n"+(S.receipts.length?S.receipts.join("\n"):"(no operations)");
   document.getElementById("debrief").classList.add("on");
 }
 
-/* ============ commands ============ */
-var CMDS=[
-  {id:"COMMIT",label:"COMMIT TROOPS",cost:"−150 troops",needsTarget:true,
-   can:function(){return S.troops>=150;},
-   run:function(i){S.troops-=150;assist(i,0.22,"COMMIT");}},
-  {id:"CAS",label:"CAS STRIKE",cost:"−1 sortie −120 req",needsTarget:true,
-   can:function(){return S.cas>0&&S.req>=120;},
-   run:function(i){S.cas--;S.req-=120;assist(i,0.4,"CAS");}},
-  {id:"MECHA",label:"ADVANCE MECHA",cost:"−1 readiness",needsTarget:true,
-   can:function(){return S.mecha>0;},
-   run:function(i){S.mecha--;assist(i,0.32,"MECHA");}},
-  /* cost label reads differently depending on whether this targets a live
-     contest (spend now, decaying) or open ground (standby, full value later) */
-  {id:"HOLD",label:"HOLD",cost:"free — logged",needsTarget:false,
-   can:function(){return true;},
-   run:function(){logf("DIRECTOR HOLDS.","sys");mark("HLD",true);
-     S.receipts.push("HOLD @ "+(90-S.t).toFixed(0)+"s — trusted the build");}},
-];
-function assist(i,base,tag){
-  var inHang = S.hang && S.hang.i===i;
-  if (inHang){                                   // late response: leverage decays
-    var lev = 0.4+(S.hang.left/S.hang.dur)*0.6;
-    S.hang.committed+=base*lev; S.hang.used=tag;
-    setGlyph(i,"+","#d8ff3d",2.5);
-    logf("▸ "+tag+" @ "+sname(i)+" — into the contest (late)","up");
-  } else {                                       // anticipation: place a standby
-    if (S.standby) logf("standby "+S.standby.cmd+" @ "+sname(S.standby.i)+" recalled.","sys");
-    S.standby={ i:i, cmd:tag, base:base };
-    setGlyph(i,"+","#d8ff3d",99);
-    logf("▸ "+tag+" on STANDBY @ "+sname(i)+" — waiting for the play.","up");
-  }
-}
-
-/* ============ render: heatmap ============ */
-function lerpColor(v){ // -0.35..0.35 => red -> amber -> green (contested band)
-  var t=(v+0.35)/0.7, r,g,b;
-  if (t<0.5){ var u=t*2; r=255+(255-255)*u; g=90+(182-90)*u; b=42+(61-42)*u; }
-  else { var u2=(t-0.5)*2; r=255+(216-255)*u2; g=182+(255-182)*u2; b=61*1; }
-  return "rgb("+(r|0)+","+(g|0)+","+(b|0)+")";
-}
+/* ================= render ================= */
 function renderMap(){
   var now=performance.now()/1000;
-  mctx.fillStyle="#0a0a0c"; mctx.fillRect(0,0,mapC.width,mapC.height);
-  mctx.font=(CELL*0.72|0)+"px "+"monospace";
-  mctx.textAlign="center"; mctx.textBaseline="middle";
-  for (var y=0;y<GH;y++) for (var x=0;x<GW;x++){
-    var i=y*GW+x, px=OX+x*CELL, py=OY+y*CELL;
-    if (S.terr[i]){ mctx.fillStyle="#17171b"; mctx.fillRect(px+1,py+1,CELL-2,CELL-2);
-      mctx.fillStyle="#0a0a0c"; mctx.fillRect(px+CELL*0.3,py+CELL*0.3,CELL*0.4,CELL*0.4); continue; }
-    var v=S.grid[i];
-    if (contested(i)){
-      var breath=0.72+0.18*Math.sin(now*1.6+i*0.7);        // slow beep, no strobe
-      mctx.globalAlpha=breath; mctx.fillStyle=lerpColor(v);
-      mctx.fillRect(px+1,py+1,CELL-2,CELL-2); mctx.globalAlpha=1;
-    } else if (v>0){ mctx.fillStyle="rgba(216,255,61,"+(0.10+v*0.6)+")"; mctx.fillRect(px+1,py+1,CELL-2,CELL-2); }
-    else { mctx.fillStyle="rgba(255,90,42,"+(0.10-v*0.6)+")"; mctx.fillRect(px+1,py+1,CELL-2,CELL-2); }
-    var gl=S.glyph[i];
-    if (gl){ if (S.t<gl.until){ delete S.glyph[i]; }
-      else { mctx.fillStyle=gl.color; mctx.fillText(gl.ch,px+CELL/2,py+CELL/2+1); } }
+  var px=img.data;
+  for (var i=0;i<N;i++){
+    var o=i*4, v=S.c[i];
+    if (S.terr[i]){ px[o]=26;px[o+1]=26;px[o+2]=30;px[o+3]=255; continue; }
+    if (v>0.05){ var g=0.16+v*0.7;
+      px[o]=216*g; px[o+1]=255*g; px[o+2]=61*g; }
+    else if (v<-0.05){ var f=0.16-v*0.7;
+      px[o]=255*f; px[o+1]=90*f; px[o+2]=42*f; }
+    else { px[o]=18;px[o+1]=19;px[o+2]=23; }
+    px[o+3]=255;
   }
-  // standby: persistent dashed ring — unlike glyphs, this doesn't expire, so
-  // the mechanic stays visible on the map the whole time it's armed
-  if (S.standby){
-    var sx=S.standby.i%GW, sy=(S.standby.i/GW)|0;
-    mctx.strokeStyle="#d8ff3d"; mctx.lineWidth=2;
-    mctx.setLineDash([4,3]); mctx.lineDashOffset=-now*6;
-    mctx.strokeRect(OX+sx*CELL+2,OY+sy*CELL+2,CELL-4,CELL-4);
-    mctx.setLineDash([]);
-  }
-  // actionable contest = the ONLY blinking element
-  if (S.hang && Math.sin(now*9)>0) box(S.hang.i,"#ff5a2a",3);
-  if (S.warn) box(S.warn.i,"#ffb63d",2);
-  if (S.target>=0) box(S.target,"#d8ff3d",3);
-  else if (S.sel>=0) box(S.sel,"#e8e4d8",2);
-  function box(i,c,w){ var bx=i%GW,by=(i/GW)|0;
-    mctx.strokeStyle=c; mctx.lineWidth=w;
-    mctx.strokeRect(OX+bx*CELL+1,OY+by*CELL+1,CELL-2,CELL-2); }
-}
+  bctx.putImageData(img,0,0);
+  mctx.clearRect(0,0,mapC.width,mapC.height);
+  mctx.drawImage(buf,0,0,GW,GH,0,0,mapC.width,mapC.height);
+  var sx=mapC.width/GW, sy=mapC.height/GH;
 
-/* ============ render: trendline with autozoom + event stamps ============ */
+  // hotspot marks: only clotted masses earn a symbol, sized by mass
+  mctx.textAlign="center"; mctx.textBaseline="middle";
+  S.hotspots.forEach(function(h){
+    var cx=(h.x*BW+BW/2)*sx, cy2=(h.y*BW+BW/2)*sy;
+    var sz=(10+h.frac*16)*(window.devicePixelRatio||1);
+    mctx.font=sz+"px monospace";
+    mctx.fillStyle = h.mean<-0.05?"rgba(255,90,42,.9)": h.mean>0.05?"rgba(216,255,61,.9)":"rgba(255,182,61,.9)";
+    mctx.fillText("◈",cx,cy2);
+  });
+  // designated objective
+  if (S.designated>=0){
+    var dbx=S.designated%BX, dby=(S.designated/BX)|0;
+    mctx.strokeStyle="#ffb63d"; mctx.lineWidth=2; mctx.setLineDash([5,4]);
+    mctx.lineDashOffset=-now*8;
+    mctx.strokeRect(dbx*BW*sx,dby*BW*sy,BW*sx,BW*sy); mctx.setLineDash([]);
+  }
+  // the team: a white pip you learn to watch
+  var T=S.team;
+  if (T.phase!=="DOWN" && T.phase!=="STAGING"){
+    var blink=T.phase==="WORK" ? (Math.sin(now*7)>0?1:0.35) : 1;
+    mctx.fillStyle="rgba(232,228,216,"+blink+")";
+    mctx.fillRect(T.x*sx-3,T.y*sy-3,6,6);
+    if (T.obj){ mctx.strokeStyle="rgba(232,228,216,.35)"; mctx.lineWidth=1;
+      mctx.beginPath(); mctx.moveTo(T.x*sx,T.y*sy);
+      mctx.lineTo((T.obj.x*BW+BW/2)*sx,(T.obj.y*BW+BW/2)*sy); mctx.stroke(); }
+    if (T.phase==="WORK"){                             // progress arc over the pip
+      mctx.strokeStyle="#d8ff3d"; mctx.lineWidth=2.5;
+      mctx.beginPath(); mctx.arc(T.x*sx,T.y*sy,9,-Math.PI/2,-Math.PI/2+T.prog/100*Math.PI*2); mctx.stroke();
+    }
+  }
+}
 function mark(label,up){ S.marks.push({k:S.hist.length,label:label,up:up}); }
 function renderTrend(){
-  var W=trC.width,H=trC.height,PADR=34;
+  var W=trC.width,H=trC.height,PADR=30;
   tctx.fillStyle="#0a0a0c"; tctx.fillRect(0,0,W,H);
-  var n=S.hist.length; if (n<2) return;
-  // autozoom: y-range fits the data, min span so noise doesn't fill the panel
+  var n2=S.hist.length; if (n2<2) return;
   var lo=Infinity,hi=-Infinity;
-  for (var k=0;k<n;k++){ if(S.hist[k]<lo)lo=S.hist[k]; if(S.hist[k]>hi)hi=S.hist[k]; }
-  var span=Math.max(0.18,(hi-lo)*1.25), mid=(hi+lo)/2;
+  for (var k=0;k<n2;k++){ if(S.hist[k]<lo)lo=S.hist[k]; if(S.hist[k]>hi)hi=S.hist[k]; }
+  var span=Math.max(0.14,(hi-lo)*1.25), mid=(hi+lo)/2;
   function yOf(v){ return H/2-(v-mid)/span*H*0.86; }
-  function xOf(k){ return k/(n-1)*(W-PADR); }
-  // zero axis + scale labels
   tctx.strokeStyle="#232329"; tctx.setLineDash([3,4]);
   tctx.beginPath(); tctx.moveTo(0,yOf(0)); tctx.lineTo(W-PADR,yOf(0)); tctx.stroke(); tctx.setLineDash([]);
-  tctx.font=(9*(window.devicePixelRatio||1))+"px monospace"; tctx.textAlign="left";
-  tctx.fillStyle="#6f6c62";
-  tctx.fillText(((mid+span/2)*100|0)+"%",W-PADR+3,yOf(mid+span/2)+8);
-  tctx.fillText(((mid-span/2)*100|0)+"%",W-PADR+3,yOf(mid-span/2)-2);
-  tctx.fillStyle=S.mom>=0?"#d8ff3d":"#ff5a2a";
-  tctx.fillText((S.mom>=0?"▲":"▼")+Math.abs(S.mom*10000).toFixed(0),W-PADR+3,yOf(mid)+4);
-  // the line
   tctx.strokeStyle=S.tide>=0?"#d8ff3d":"#ff5a2a"; tctx.lineWidth=2;
   tctx.beginPath();
-  for (var k2=0;k2<n;k2++){ var xx=xOf(k2),yy=yOf(S.hist[k2]); k2?tctx.lineTo(xx,yy):tctx.moveTo(xx,yy); }
+  for (var k2=0;k2<n2;k2++){ tctx.lineTo(k2/(n2-1)*(W-PADR),yOf(S.hist[k2])); }
   tctx.stroke();
-  // event stamps: tick + label pinned to the spike
-  tctx.textAlign="center";
+  tctx.font=(9*(window.devicePixelRatio||1))+"px monospace"; tctx.textAlign="center";
   S.marks.forEach(function(m,idx){
-    if (m.k>=n) return;
-    var xx=xOf(m.k), yy=yOf(S.hist[m.k]);
+    if (m.k>=n2) return;
+    var xx=m.k/(n2-1)*(W-PADR), yy=yOf(S.hist[m.k]);
     tctx.fillStyle=m.up?"#d8ff3d":"#ff5a2a";
     tctx.fillRect(xx-2,yy-2,4,4);
-    var above=(idx%2===0);
-    tctx.fillText(m.label, xx, above?Math.max(10,yy-8):Math.min(H-4,yy+14));
+    tctx.fillText(m.label,xx,(idx%2?Math.min(H-4,yy+13):Math.max(9,yy-7)));
   });
 }
-
-/* ============ render: telemetry + command ============ */
-function renderInfo(){
-  var st=[["REQ",S.req|0,S.req<120],["TROOP",S.troops,S.troops<200],
-          ["MECHA",S.mecha,S.mecha===0],["CAS",S.cas,S.cas===0],
-          ["SECT",captured(),false],["MOM",(S.mom>=0?"+":"")+(S.mom*1000).toFixed(1),S.mom<0]];
-  document.getElementById("stats").innerHTML=st.map(function(s){
-    return '<div class="stat'+(s[2]?" low":"")+'"><div class="k">'+s[0]+'</div><div class="v">'+s[1]+'</div></div>';
+var cues=[];
+function cue(m,cls){ cues.unshift({m:m,cls:cls||""});
+  if (cues.length>5) cues.pop();
+  document.getElementById("cues").innerHTML=cues.map(function(c2){
+    return '<div class="cue '+c2.cls+'">'+c2.m+'</div>'; }).join(""); }
+function renderDeck(){
+  var T=S.team;
+  var st=[["TIDE",(S.tide>=0?"+":"")+(S.tide*100|0)+"%",S.tide<0],
+          ["REQ",S.req|0,S.req<80],["CAS",S.cas,S.cas===0],
+          ["141",T.hp+"/4 "+T.phase,T.hp<=1],
+          ["MORALE",(T.morale*100|0)+"%",T.morale<0.8]];
+  document.getElementById("stats").innerHTML=st.map(function(s2){
+    return '<div class="stat'+(s2[2]?" low":"")+'"><span class="k">'+s2[0]+'</span><span class="v">'+s2[1]+'</span></div>';
   }).join("");
-  var hb=document.getElementById("hangbox");
-  if (S.hang){ hb.classList.add("on");
-    document.getElementById("hangname").textContent=S.hang.play.name+" @ "+sname(S.hang.i);
-    document.getElementById("hangreq").textContent=S.hang.cs+" "+S.hang.play.call;
-    hb.querySelector("#lev i").style.width=((S.hang.left/S.hang.dur)*100)+"%";
-  } else hb.classList.remove("on");
-  var sb=document.getElementById("standbybox");
-  if (S.standby){ sb.classList.add("on");
-    document.getElementById("standbytxt").textContent="◈ "+S.standby.cmd+" STANDBY @ "+sname(S.standby.i);
-  } else sb.classList.remove("on");
-  // mode drives layout emphasis: hang > buildup > scouting
-  document.getElementById("device").dataset.mode = S.hang?"hang":S.warn?"buildup":"scouting";
-  var d=document.getElementById("detail");
-  if (S.mode==="target"){
-    var willStandby = !(S.hang && S.target===S.hang.i);
-    d.innerHTML="<b>"+S.pending.label+"</b> — tap target, ENTER to send.\n"
-      +(willStandby ? "open ground → arms as <b>STANDBY</b>, full value when a play lands nearby."
-                     : "the live contest → commits <b>now</b>, value decaying.")
-      +(S.target>=0?" ["+sname(S.target)+"]":"");
-  }
-  else if (S.sel>=0){
-    if (S.terr[S.sel]) d.innerHTML="SECTOR <b>"+sname(S.sel)+"</b> // impassable terrain — chokepoint.";
-    else { var v=S.grid[S.sel];
-      d.innerHTML="SECTOR <b>"+sname(S.sel)+"</b> // control "+(v*100|0)+"% "
-        +(v>0.05?"<b>OURS</b>":v<-0.05?"HOSTILE":"<b>CONTESTED</b>")
-        +(contested(S.sel)?"\nconquerable — pressure applies.":""); }
-  } else d.textContent="tap the map to read a sector.";
-  document.getElementById("bclock").textContent=Math.max(0,S.t).toFixed(1);
+  var rb=document.getElementById("reqbar");
+  if (S.cue){ rb.classList.add("on");
+    document.getElementById("reqtxt").textContent="141 REQUESTS "+S.cue.r.verb+" — "+S.cue.r.cost;
+    rb.querySelector("#reqwin i").style.width=(S.cue.left/S.cue.dur*100)+"%";
+  } else rb.classList.remove("on");
+  document.getElementById("bclock").textContent=Math.max(0,S.t).toFixed(0);
   var tp=document.getElementById("tidepct");
   tp.textContent=(S.tide>=0?"+":"")+(S.tide*100).toFixed(0)+"%";
   tp.style.color=S.tide>=0?"#d8ff3d":"#ff5a2a";
+  renderButtons();
 }
-var feedLines=[];
-function logf(m,cls){ feedLines.unshift('<div class="'+(cls||"")+'">'+m+'</div>');
-  if (feedLines.length>4) feedLines.pop();
-  document.getElementById("feed").innerHTML=feedLines.join(""); }
 
-function renderOptions(){
-  var list=document.getElementById("optlist"), foot=document.getElementById("footer");
-  if (S.mode==="root"){
-    foot.classList.remove("on");
-    var rec=S.hang?S.hang.req:null;    // what the radio ASKED for — not always right
-    list.innerHTML=CMDS.map(function(c,k){
-      var isRec=rec===c.id;
-      return '<button class="opt'+(isRec?" rec":"")+'" data-k="'+k+'"'+(c.can()?"":" disabled")+'>'
-        +'<span>'+c.label+(isRec?" ◂ CALLED":"")+'</span><span class="cost">'+c.cost+'</span></button>';
-    }).join("");
-  } else { list.innerHTML=""; foot.classList.add("on");
-    document.getElementById("btnenter").disabled=S.pending.needsTarget&&S.target<0; }
-}
-document.getElementById("optlist").addEventListener("click",function(e){
-  var b=e.target.closest(".opt"); if(!b||S.over)return;
-  var c=CMDS[+b.dataset.k]; if(!c.can())return;
-  if (!c.needsTarget){ c.run(); return; }
-  S.mode="target"; S.pending=c; S.target=(S.hang?S.hang.i:-1);
-  renderOptions();
-});
-document.getElementById("btnreturn").addEventListener("click",function(){
-  S.mode="root"; S.pending=null; S.target=-1; renderOptions();
-});
-document.getElementById("btnenter").addEventListener("click",function(){
-  if (S.pending&&(!S.pending.needsTarget||S.target>=0)){
-    S.pending.run(S.target);
-    S.mode="root"; S.pending=null; S.target=-1; renderOptions();
+/* ============ buttons: 4 fixed slots, press-to-arm, press-to-fire ============ */
+var BTN=[
+  { label:function(){ return S.cue ? "✓ "+S.cue.r.verb : "— NO REQUEST —"; },
+    hot:function(){ return !!S.cue; }, can:function(){ return !!S.cue; },
+    fire:function(){ var c2=S.cue; S.cue=null; c2.r.yes(); } },
+  { label:function(){ return S.team.urge?"URGING ▮":"URGE 141"; },
+    tog:function(){ return S.team.urge; }, can:function(){ return S.team.hp>0; },
+    fire:function(){ S.team.urge=!S.team.urge;
+      cue(S.team.urge?"you: push. 141: pushing.":"you: steady. 141: copy.","team"); } },
+  { label:function(){ return "CAS COVER"; }, can:function(){ return S.cas>0&&S.team.phase!=="DOWN"; },
+    fire:function(){ S.cas--; blast(S.team.x,S.team.y,9,0.5); S.team.heat=0;
+      mark("CAS",true); cue("CAS cover on 141's position.","up"); } },
+  { label:function(){ return "RECALL 141"; },
+    can:function(){ return S.team.phase==="INSERT"||S.team.phase==="WORK"; },
+    fire:function(){ S.team.phase="EXFIL"; S.cue=null; cue("you: abort. 141 exfiltrating.","team"); } },
+];
+function renderButtons(){
+  for (var k=0;k<4;k++){
+    var b=document.getElementById("b"+k), d=BTN[k];
+    var armed=S.arm[k]>0;
+    b.textContent = armed ? "CONFIRM ▸" : d.label();
+    b.disabled = !d.can() || S.over;
+    b.className = armed?"armed" : (d.hot&&d.hot()?"hot" : (d.tog&&d.tog()?"togon":""));
   }
+}
+["b0","b1","b2","b3"].forEach(function(id,k){
+  document.getElementById(id).addEventListener("click",function(){
+    if (!BTN[k].can()||S.over) return;
+    if (S.arm[k]>0){ S.arm[k]=0; BTN[k].fire(); renderDeck(); }
+    else { for(var j=0;j<4;j++) S.arm[j]=0; S.arm[k]=2.5; renderButtons(); }
+  });
 });
+
+/* map tap = designate objective block */
 mapC.addEventListener("pointerdown",function(e){
   var r=mapC.getBoundingClientRect();
-  var x=(((e.clientX-r.left)/r.width*mapC.width-OX)/CELL)|0;
-  var y=(((e.clientY-r.top)/r.height*mapC.height-OY)/CELL)|0;
-  if (x<0||x>=GW||y<0||y>=GH) return;
-  var i=y*GW+x;
-  if (S.mode==="target") S.target=i; else S.sel=i;
-  renderOptions();
+  var bx=((e.clientX-r.left)/r.width*BX)|0, by=((e.clientY-r.top)/r.height*BY)|0;
+  if (bx<0||bx>=BX||by<0||by>=BY) return;
+  S.designated=by*BX+bx;
+  cue("objective designated: "+bname({x:bx,y:by})+" — 141 will take it next.","team");
 });
-document.getElementById("again").addEventListener("click",function(){
-  document.getElementById("debrief").classList.remove("on");
-  feedLines=[]; reset(); renderOptions();
-});
-document.getElementById("standbybox").addEventListener("click",function(){
-  if (!S.standby) return;
-  logf("standby "+S.standby.cmd+" @ "+sname(S.standby.i)+" recalled.","sys");
-  S.standby=null;
-});
+function bname(b){ return String.fromCharCode(65+b.y)+"-"+(b.x+1); }
+
 document.getElementById("btnpause").addEventListener("click",function(){
   S.paused=!S.paused;
-  this.textContent=S.paused?"▶":"⏸";
-  this.classList.toggle("on",S.paused);
+  this.textContent=S.paused?"▶":"⏸"; this.classList.toggle("on",S.paused);
   document.getElementById("phase").textContent=S.paused?"THEATRE 7 // PAUSED":"THEATRE 7 // LIVE";
 });
+document.getElementById("again").addEventListener("click",function(){
+  document.getElementById("debrief").classList.remove("on"); reset();
+});
 
-/* ============ loop ============ */
+/* ================= loop ================= */
 var last=performance.now();
 function loop(now){
   var dt=Math.min(0.1,(now-last)/1000); last=now;
-  advance(dt); renderMap(); renderTrend(); renderInfo();
+  advance(dt);
+  for (var k=0;k<4;k++) if (S.arm[k]>0){ S.arm[k]-=dt; if (S.arm[k]<=0){S.arm[k]=0; renderButtons();} }
+  renderMap(); renderTrend(); renderDeck();
   requestAnimationFrame(loop);
 }
-fit(mapC); fit(trC); gridFit(); reset(); renderOptions(); requestAnimationFrame(loop);
+fit(mapC); fit(trC); reset(); requestAnimationFrame(loop);
 </script>
 </body>
 </html>
