@@ -332,10 +332,10 @@ function fortScan(){
     mean/=(n3||1);
     [1,-1].forEach(function(s){
       var mine=s>0?c3.pos:c3.neg;
-      if (mine>=6 && mine>=tot*0.75 && mean*s>0.15 && !fortAtBlock(bx,by)
+      if (mine>=5 && mine>=tot*0.7 && mean*s>0.05 && !fortAtBlock(bx,by)
           && S.forts.filter(function(f){return f.side===s;}).length<3){
-        var rate=0.6*(S.recoup[String(s)]>0?2:1)
-                    *(s>0?(gp<0.45?1.8:1):(gp>0.7?1.8:1));   // pressed side digs in harder
+        var rate=0.75*(S.recoup[String(s)]>0?2:1)
+                     *(s>0?(gp<0.45?1.8:1):(gp>0.7?1.8:1));   // pressed side digs in harder
         var e=S.build[b2];
         if (!e||e.side!==s) e=S.build[b2]={side:s,t:0,warned:false};
         e.t+=rate;
@@ -349,6 +349,7 @@ function fortScan(){
           tick(nm+" established — "+(s>0?"line anchored":"they are dug in"),
                s>0?"up":"bad", true);
           S.receipts.push((s>0?"◈ ":"▼ ")+nm+" raised");
+          if (s<0) S.recoup["1"]=10;    // an enemy redoubt is exactly what blufor answers
         }
       } else if (S.build[b2] && S.build[b2].side===s){
         S.build[b2].t=Math.max(0,S.build[b2].t-0.3);
@@ -595,6 +596,7 @@ function teamHit(sq,why){
     if (last2) tick(last2.cs+" is the last one standing","bad",true);
   }
   if (sq.hp<=0){ sq.phase="DOWN"; sq.pt=20; sq.morale=Math.max(0.5,sq.morale-0.2);
+    if (sq.side>0) S.recoup["1"]=8;   // losing a team makes the line dig in
     if (sq.player) S.cue=null;
     tick(sq.name+" COMBAT INEFFECTIVE — extracting under fire","bad",true);
     S.receipts.push("██ "+sq.name+" wiped to extraction — refit, morale down.");
