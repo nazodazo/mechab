@@ -636,9 +636,17 @@ function renderTrend(){
 var MQ={ main:{w:0,off:0,speed:32}, A:{w:0,off:0,speed:26}, B:{w:0,off:0,speed:26},
          C:{w:0,off:0,speed:26}, D:{w:0,off:0,speed:26} };
 function mqFill(wrap,html){
-  wrap.innerHTML='<div class="tkin"></div><div class="tkin"></div>';
-  wrap.children[0].innerHTML=html; wrap.children[1].innerHTML=html;
-  return wrap.children[0].scrollWidth;
+  // as many copies as it takes to cover the container plus one spare, so the
+  // tape is continuous even when the text is shorter than the window
+  wrap.innerHTML='<div class="tkin"></div>';
+  wrap.children[0].innerHTML=html;
+  var w=wrap.children[0].scrollWidth||1, cw=wrap.clientWidth||1;
+  var need=Math.max(2,Math.ceil(cw/w)+1);
+  for (var k=1;k<need;k++){
+    var c=document.createElement("div"); c.className="tkin"; c.innerHTML=html;
+    wrap.appendChild(c);
+  }
+  return w;
 }
 function tickMarquees(dt){
   ["main","A","B","C","D"].forEach(function(key){
@@ -646,9 +654,9 @@ function tickMarquees(dt){
     m.off+=m.speed*dt; if (m.off>=m.w) m.off-=m.w;
     var wrap = key==="main" ? document.getElementById("tickwrap")
                             : document.querySelector("#tk"+key+" .tape");
-    if (!wrap || wrap.children.length<2) return;
-    wrap.children[0].style.transform="translateX(-"+m.off+"px)";
-    wrap.children[1].style.transform="translateX("+(m.w-m.off)+"px)";
+    if (!wrap) return;
+    for (var k=0;k<wrap.children.length;k++)
+      wrap.children[k].style.transform="translateX("+(k*m.w-m.off)+"px)";
   });
 }
 var ticks=[];
