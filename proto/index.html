@@ -197,6 +197,7 @@ function reset(){
       cue:null, arm:[0,0,0,0,0], mon:null,
       mechaCd:0, mechaUnit:null,
       kiaB:0, kiaO:0, opsDone:0, ff:0, domT:0, fx:[],
+      forts:[], build:{}, recoup:{"1":0,"-1":0},
       troops:[],
       squads:[ mkSquad("141",1,true), mkSquad("BULL-6",1,false), mkSquad("RAZOR-2",1,false),
                mkSquad("KESSEL",-1,false), mkSquad("HARROW",-1,false) ],
@@ -297,7 +298,75 @@ function caStep(){
     var v=S.c[i] + 0.13*slope*(avg-S.c[i]) + (Math.random()-0.5)*0.014;
     if (Math.abs(v)<0.55) v-=v*(0.04+S.h[i]*0.05);   // — and fronts stall on the high ground
     if (x<3) v=Math.max(v,0.9); if (x>=GW-3) v=Math.min(v,-0.9);
+    // forts: ground with memory — clamps the field inside the perimeter
+    for (var f7=0;f7<S.forts.length;f7++){ var ft=S.forts[f7];
+      if (Math.hypot(x-ft.x,y-ft.y)<ft.r){
+        if (ft.side>0) v=Math.max(v,0.5); else v=Math.min(v,-0.5); } }
     S.c[i]=v>1?1:v<-1?-1:v;
+  }
+}
+/* ============ fortification: emergent, both sides, never player-placed ============
+   A block where one side masses (≥6 troops, ≥75% of local force, on own ground)
+   builds toward a fort over ~5s. At halfway the player gets the only hint they
+   get: a massing warning. Build accelerates while a side is recouping after a
+   devastating strike, or when the theatre has swung hard against it. Forts clamp
+   the control field (ground with memory), are eroded by enemy troops inside the
+   perimeter, and are dismantled hard by LAOE. */
+function fortAtBlock(bx,by){
+  return S.forts.some(function(f){ return Math.hypot(f.x-(bx*BW+BW/2),f.y-(by*BW+BW/2))<f.r*2; });
+}
+function fortScan(){
+  var gp=groundPct();
+  var cnt={};
+  for (var k=0;k<S.troops.length;k++){ var tr=S.troops[k];
+    if (tr.dead>0) continue;
+    var b=((tr.y/BW)|0)*BX+((tr.x/BW)|0);
+    var c2=cnt[b]||(cnt[b]={pos:0,neg:0});
+    if (tr.side>0) c2.pos++; else c2.neg++;
+  }
+  for (var b2 in cnt){
+    var bx=b2%BX, by=(b2/BX)|0, c3=cnt[b2], tot=c3.pos+c3.neg;
+    var mean=0,n3=0;
+    for (var y=0;y<BW;y+=2) for (var x=0;x<BW;x+=2){
+      var i=(by*BW+y)*GW+(bx*BW+x); if (!S.terr[i]){ mean+=S.c[i]; n3++; } }
+    mean/=(n3||1);
+    [1,-1].forEach(function(s){
+      var mine=s>0?c3.pos:c3.neg;
+      if (mine>=6 && mine>=tot*0.75 && mean*s>0.15 && !fortAtBlock(bx,by)
+          && S.forts.filter(function(f){return f.side===s;}).length<3){
+        var rate=0.6*(S.recoup[String(s)]>0?2:1)
+                    *(s>0?(gp<0.45?1.8:1):(gp>0.7?1.8:1));   // pressed side digs in harder
+        var e=S.build[b2];
+        if (!e||e.side!==s) e=S.build[b2]={side:s,t:0,warned:false};
+        e.t+=rate;
+        if (e.t>2.5 && !e.warned){ e.warned=true;
+          tick((s>0?"BLUFOR":"OPFOR")+" massing at "+bname({x:bx,y:by})
+               +(s<0?" — credible threat":""), s>0?"team":"bad", s<0); }
+        if (e.t>=5){
+          delete S.build[b2];
+          var nm=(s>0?"FOB ":"REDOUBT ")+bname({x:bx,y:by});
+          S.forts.push({x:bx*BW+BW/2, y:by*BW+BW/2, side:s, hp:10, r:6, name:nm});
+          tick(nm+" established — "+(s>0?"line anchored":"they are dug in"),
+               s>0?"up":"bad", true);
+          S.receipts.push((s>0?"◈ ":"▼ ")+nm+" raised");
+        }
+      } else if (S.build[b2] && S.build[b2].side===s){
+        S.build[b2].t=Math.max(0,S.build[b2].t-0.3);
+        if (S.build[b2].t<=0) delete S.build[b2];
+      }
+    });
+  }
+  // erosion: enemy troops inside the perimeter dismantle it
+  for (var f4=S.forts.length-1;f4>=0;f4--){
+    var f5=S.forts[f4], enemies=0;
+    for (var k2=0;k2<S.troops.length;k2++){ var tr2=S.troops[k2];
+      if (tr2.dead<=0 && tr2.side!==f5.side && Math.hypot(tr2.x-f5.x,tr2.y-f5.y)<f5.r) enemies++; }
+    if (enemies>0) f5.hp-=enemies*0.12;
+    if (f5.hp<=0){
+      S.forts.splice(f4,1);
+      tick(f5.name+" overrun — position dismantled", f5.side>0?"bad":"up", true);
+      S.receipts.push((f5.side>0?"▼ ":"◈ ")+f5.name+" fell");
+    }
   }
 }
 function findHotspots(){
@@ -366,6 +435,15 @@ function strike(cx,cy,rad,amt){
   });
   S.ff+=ff;
   if (ff>3) tick("strike caught our own line — "+ff+" friendly KIA","bad",true);
+  // LAOE dismantles fortifications hard, and a mauled side digs in to recoup
+  S.forts.forEach(function(f8){
+    if (Math.hypot(f8.x-cx,f8.y-cy)<rad+f8.r*0.5) f8.hp-=6;
+  });
+  var koHere=0,kbHere=0;
+  S.troops.forEach(function(tr){ if (tr.dead>0&&Math.hypot(tr.x-cx,tr.y-cy)<rad){
+    if (tr.side>0) kbHere++; else koHere++; } });
+  if (koHere>=6) S.recoup["-1"]=10;
+  if (kbHere>=6) S.recoup["1"]=10;
 }
 function bname(b){ return String.fromCharCode(65+b.y)+"-"+(b.x+1); }
 
@@ -475,9 +553,16 @@ function squadTick(sq,dt){
     return;
   }
   if (sq.phase==="EXFIL"){
-    var hx=sq.side>0?4:GW-4;
-    var dx2=hx-sq.x, dy2=GH/2-sq.y, d2=Math.hypot(dx2,dy2);
-    if (d2<3){ sq.phase="STAGING"; sq.pt=5+Math.random()*3; return; }
+    // nearest friendly fort beats the long zipline home — forward basing
+    var hx=sq.side>0?4:GW-4, hy=GH/2, hd=Math.hypot(hx-sq.x,hy-sq.y), fwd=false;
+    S.forts.forEach(function(f9){
+      if (f9.side!==sq.side) return;
+      var fd=Math.hypot(f9.x-sq.x,f9.y-sq.y);
+      if (fd<hd){ hx=f9.x; hy=f9.y; hd=fd; fwd=true; }
+    });
+    var dx2=hx-sq.x, dy2=hy-sq.y, d2=Math.hypot(dx2,dy2);
+    if (d2<3){ sq.phase="STAGING"; sq.pt=5+Math.random()*3;
+      if (sq.player&&fwd) tick("141 restaging at forward position","team"); return; }
     sq.x+=dx2/d2*7*dt; sq.y+=dy2/d2*7*dt;
   }
 }
@@ -593,7 +678,9 @@ function advance(dt){
   if (S.over||S.paused) return;
   S.t-=dt;
   S.caTimer+=dt; if (S.caTimer>=0.12){ S.caTimer-=0.12; caStep(); }
-  S.hotTimer+=dt; if (S.hotTimer>0.6){ S.hotTimer=0; findHotspots(); }
+  S.hotTimer+=dt; if (S.hotTimer>0.6){ S.hotTimer=0; findHotspots(); fortScan(); }
+  if (S.recoup["1"]>0) S.recoup["1"]-=dt;
+  if (S.recoup["-1"]>0) S.recoup["-1"]-=dt;
   for (var k=0;k<S.troops.length;k++) troopTick(S.troops[k],dt);
   S.squads.forEach(function(sq){ squadTick(sq,dt); });
   mechaTick(dt);
@@ -759,6 +846,21 @@ function renderMap(){
     mctx.beginPath(); mctx.arc(mxp,myp,rad2,0,Math.PI*2); mctx.stroke(); mctx.setLineDash([]);
     mctx.fillStyle="#ffb63d"; mctx.fillRect(mxp-1*d,myp-1*d,2*d,2*d);
   }
+  // forts: labeled entities, the ground that remembers
+  S.forts.forEach(function(f9){
+    var fx2=f9.x*sx, fy2=f9.y*sy, fr2=f9.r*sx;
+    var col9=f9.side>0?"216,255,61":"255,90,42";
+    mctx.strokeStyle="rgba("+col9+",.55)"; mctx.lineWidth=Math.max(1,d);
+    mctx.setLineDash([3*d,2*d]);
+    mctx.strokeRect(fx2-fr2*0.7,fy2-fr2*0.7,fr2*1.4,fr2*1.4);
+    mctx.setLineDash([]);
+    mctx.fillStyle="rgba("+col9+",.9)";
+    mctx.fillRect(fx2-2*d,fy2-2*d,4*d,4*d);
+    mctx.font=(6.5*d)+"px monospace"; mctx.textAlign="center"; mctx.textBaseline="bottom";
+    mctx.fillText(f9.name,fx2,fy2-fr2*0.7-2*d);
+    mctx.fillStyle="rgba("+col9+",.5)";
+    mctx.fillRect(fx2-fr2*0.7,fy2+fr2*0.7+2*d,fr2*1.4*Math.max(0,f9.hp/10),1.5*d);
+  });
   if (S.mechaUnit){
     var m=S.mechaUnit, mx=m.x*sx, my=m.y*sy;
     mctx.fillStyle="rgba(232,228,216,.95)";
