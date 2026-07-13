@@ -53,13 +53,13 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 #feed div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--dim)}
 #feed .up{color:var(--us)} #feed .bad{color:var(--foe)} #feed .rq{color:var(--amber)} #feed .team{color:var(--ink)}
 
-#deck{flex:1;margin-top:5px;padding:10px 8px 8px;display:flex;flex-direction:column;gap:6px;overflow:hidden}
+#deck{flex:1;margin-top:5px;padding:14px 8px 8px;display:flex;flex-direction:column;gap:6px;overflow:hidden}
 #reqbar{border:1px solid var(--amber);padding:4px 8px;display:none;flex:none}
 #reqbar.on{display:block}
 #reqbar .t{color:var(--amber);font-size:11px}
 #reqwin{height:5px;background:var(--bg);margin-top:3px}
 #reqwin i{display:block;height:100%;background:var(--amber);width:100%}
-#deckmain{flex:1;display:flex;gap:8px;min-height:0}
+#deckmain{flex:1;display:flex;gap:8px;min-height:0;overflow:hidden}
 /* left: two text tiles + the forces pictogram */
 #leftcol{width:42%;flex:none;display:flex;flex-direction:column;gap:4px;min-height:0}
 #tiles{display:grid;grid-template-columns:1fr 1fr;gap:4px}
@@ -70,7 +70,7 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 .stat.low .v{color:var(--foe)}
 #forces{flex:1;width:100%;border:1px solid var(--line);background:var(--bg);
   image-rendering:pixelated;min-height:0}
-#squads{flex:1;display:flex;flex-direction:column;gap:4px;min-width:0}
+#squads{flex:1;display:flex;flex-direction:column;gap:4px;min-width:0;min-height:0;overflow:hidden}
 .sq{border:1px solid var(--line);background:var(--bg);padding:3px 7px;
   display:grid;grid-template-columns:auto 1fr auto;gap:7px;align-items:baseline}
 .sq .nm{white-space:nowrap}
@@ -83,7 +83,7 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 #hostiles{font-size:10px;color:var(--foe);letter-spacing:.06em;padding:1px 2px}
 /* war ledger: fills the idle space with the macro story */
 #ledger{margin-top:auto;border:1px solid var(--line);background:var(--bg);
-  padding:4px 8px;font-size:10px;color:var(--dim);line-height:1.6}
+  padding:3px 8px;font-size:10px;color:var(--dim);line-height:1.45}
 #ledger b{color:var(--ink);font-weight:400}
 #ledger .up{color:var(--us)} #ledger .bad{color:var(--foe)}
 #ledger .lrow{display:flex;justify-content:space-between}
@@ -501,9 +501,9 @@ function renderMap(){
     else if (v<-0.05){ var f=0.2-v*0.62; px[o]=255*f; px[o+1]=90*f; px[o+2]=42*f; }
     else { px[o]=32;px[o+1]=33;px[o+2]=38; }
     // topographic contours: faint line wherever the elevation band steps
-    var x2=i%GW, lvl=(S.h[i]*5)|0;
-    if ((x2<GW-1 && ((S.h[i+1]*5)|0)!==lvl) || (i<N-GW && ((S.h[i+GW]*5)|0)!==lvl)){
-      px[o]=px[o]*0.72+232*0.28|0; px[o+1]=px[o+1]*0.72+228*0.28|0; px[o+2]=px[o+2]*0.72+216*0.28|0;
+    var x2=i%GW, lvl=(S.h[i]*3)|0;
+    if ((x2<GW-1 && ((S.h[i+1]*3)|0)!==lvl) || (i<N-GW && ((S.h[i+GW]*3)|0)!==lvl)){
+      px[o]=px[o]*0.88+232*0.12|0; px[o+1]=px[o+1]*0.88+228*0.12|0; px[o+2]=px[o+2]*0.88+216*0.12|0;
     }
     px[o+3]=255;
   }
