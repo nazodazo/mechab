@@ -221,6 +221,7 @@ function reset(){
     }
   });
   S.h=new Float32Array(N);
+  S.scorch=new Float32Array(N);              // deadzone: devastation, not territory
   genTerrain(); genHeight();
   for (var y=0;y<GH;y++) for (var x=0;x<GW;x++){
     var i=y*GW+x; if (S.terr[i]) continue;
@@ -302,6 +303,8 @@ function caStep(){
     for (var f7=0;f7<S.forts.length;f7++){ var ft=S.forts[f7];
       if (Math.hypot(x-ft.x,y-ft.y)<ft.r){
         if (ft.side>0) v=Math.max(v,0.5); else v=Math.min(v,-0.5); } }
+    // deadzones resist being claimed; the scars fade slowly
+    if (S.scorch[i]>0.01){ v*=(1-S.scorch[i]*0.6); S.scorch[i]*=0.995; }
     S.c[i]=v>1?1:v<-1?-1:v;
   }
 }
@@ -424,8 +427,9 @@ function strike(cx,cy,rad,amt){
       var dd=Math.hypot(x-cx,y-cy); if (dd>rad) continue;
       var i=y*GW+x, fall=1-dd/rad;
       S.h[i]=Math.max(0,S.h[i]-fall*0.55);                 // crater
+      S.scorch[i]=Math.min(1,S.scorch[i]+fall*1.2);        // scorched earth — nobody's color
       if (S.terr[i] && dd<rad*0.8) S.terr[i]=0;            // ridge avalanched flat
-      if (!S.terr[i]) S.c[i]=Math.max(-1,Math.min(1,S.c[i]*0.25+amt*fall));
+      if (!S.terr[i]) S.c[i]*=0.1*(1-fall);                // devastation claims no side
     }
   contourDirty=true;
   var ff=0;
@@ -810,6 +814,11 @@ function renderMap(){
     if (v>0.05){ var g=0.2+v*0.62; px[o]=216*g; px[o+1]=255*g; px[o+2]=61*g; }
     else if (v<-0.05){ var f=0.2-v*0.62; px[o]=255*f; px[o+1]=90*f; px[o+2]=42*f; }
     else { px[o]=32;px[o+1]=33;px[o+2]=38; }
+    // scorched earth overrides faction color — devastation is nobody's ground
+    var sc=S.scorch[i];
+    if (sc>0.05){
+      px[o]=px[o]*(1-sc)+58*sc; px[o+1]=px[o+1]*(1-sc)+46*sc; px[o+2]=px[o+2]*(1-sc)+38*sc;
+    }
     // hillshade: high ground bright, craters read as dark pits
     var hs=0.62+S.h[i]*0.75;
     px[o]*=hs; px[o+1]*=hs; px[o+2]*=hs;
