@@ -81,8 +81,8 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 .sq .nm{font-size:11px;letter-spacing:.06em}
 .sq.mine .nm{color:var(--us)}
 .sq .st{font-size:10px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sq .hp{font-size:10px;letter-spacing:.1em}
-.sq .hp b{color:var(--us);font-weight:400} .sq .hp span{color:var(--line)}
+.sq .hp{font-size:10px;letter-spacing:.1em;white-space:nowrap}
+.sq .hp svg{margin-left:2px}
 #hostiles{font-size:10px;color:var(--foe);letter-spacing:.06em;padding:1px 2px}
 /* war ledger: fills the idle space with the macro story */
 #ledger{margin-top:auto;border:1px solid var(--line);background:var(--bg);
@@ -166,7 +166,7 @@ function reset(){
       req:300, cas:3, mat:0,
       tide:0, hist:[], marks:[], receipts:[],
       hotspots:[], hotTimer:0, designated:-1,
-      cue:null, arm:[0,0,0,0,0],
+      cue:null, arm:[0,0,0,0,0], mon:null,
       mechaCd:0, mechaUnit:null,
       kiaB:0, kiaO:0, opsDone:0,
       troops:[],
@@ -174,6 +174,12 @@ function reset(){
                mkSquad("KESSEL",-1,false), mkSquad("HARROW",-1,false) ],
   };
   for (var k=0;k<TN;k++) S.troops.push(mkTroop(k%2?1:-1));
+  // crew: named individuals, not an anonymous pool. one doll each on the board.
+  var names=CS_NAMES.slice();
+  for (var n3=names.length-1;n3>0;n3--){ var j3=(Math.random()*(n3+1))|0, tm=names[n3]; names[n3]=names[j3]; names[j3]=tm; }
+  S.squads.forEach(function(sq){ if (sq.side<0) return;
+    for (var c3=0;c3<4;c3++) sq.crew.push({cs:names.pop()||"OP-"+c3, st:"OK", ops:0, star:false});
+  });
   S.h=new Float32Array(N);
   genTerrain(); genHeight();
   for (var y=0;y<GH;y++) for (var x=0;x<GW;x++){
@@ -184,8 +190,9 @@ function reset(){
   tick("THEATRE 7 OPEN — lines advancing on both sides",'up',true);
   tick("141 is yours. tap the map to designate their objective",'rq',true);
 }
+var CS_NAMES=["VOSS","KIRIN","DRAKE","MARA","ECHO","SABLE","HALE","IBEX","NYX","ORIN","PIKE","RUNE","TALA","VEGA","WREN","ZANE"];
 function mkSquad(name,side,player){
-  return { name:name, side:side, player:player, hp:4, morale:1,
+  return { name:name, side:side, player:player, hp:4, morale:1, crew:[],
            phase:"STAGING", pt:2+Math.random()*4,
            x: side>0?4:GW-4, y: GH*(0.25+Math.random()*0.5),
            obj:null, op:null, prog:0, heat:0, urge:false };
@@ -323,7 +330,20 @@ function opFor(sq,obj){
 }
 function opComplete(sq){
   var o=sq.obj, cx=o.x*BW+BW/2, cy=o.y*BW+BW/2;
-  if (sq.side>0) S.opsDone++;
+  if (sq.side>0){ S.opsDone++;
+    // the op belongs to the people who walked out of it
+    var up=sq.crew.filter(function(m){return m.st==="OK";});
+    up.forEach(function(m){ m.ops++;
+      if (m.ops>=2 && !m.star){ m.star=true;
+        if (sq.player) tick(m.cs+" distinguished — field promotion ★","up",true);
+        S.receipts.push("★ "+sq.name+" — "+m.cs+" promoted ("+m.ops+" ops)");
+      }
+    });
+    if (up.length===1 && sq.player){
+      tick(up[0].cs+" carried it out alone — mission accomplished","up",true);
+      S.receipts.push("◈ "+up[0].cs+" — sole operative on completion. Remember the name.");
+    }
+  }
   if (!sq.player){ blast(cx,cy,7,sq.side*0.5); return; }
   switch (sq.op.id){
     case "DA": blast(cx,cy,11,0.85); S.req+=100;
@@ -342,7 +362,9 @@ function opComplete(sq){
 }
 function squadTick(sq,dt){
   if (sq.phase==="DOWN"){ sq.pt-=dt; if (sq.pt<=0){ sq.phase="STAGING"; sq.pt=4;
-      sq.hp=Math.min(4,sq.hp+2); if (sq.player) tick("141 refit — restaged","team"); } return; }
+      sq.hp=Math.min(4,sq.hp+2);
+      var rev=2; sq.crew.forEach(function(m){ if (rev>0&&m.st==="DOWN"){ m.st="OK"; rev--; } });
+      if (sq.player) tick("141 refit — restaged","team"); } return; }
   if (sq.phase==="STAGING"){ sq.pt-=dt;
     if (sq.pt<=0){
       sq.obj=pickObjective(sq); if (!sq.obj){ sq.pt=3; return; }
@@ -394,8 +416,16 @@ function pickObjective(sq){
 }
 function teamHit(sq,why){
   sq.hp--; sq.heat=Math.max(0,sq.heat-6);
-  tick(sq.name+": man down — "+why,"bad",true);
-  S.receipts.push("▼ "+sq.name+" casualty — "+why);
+  var up=sq.crew.filter(function(m){return m.st==="OK";});
+  var m=up.length?up[(Math.random()*up.length)|0]:null;
+  if (m) m.st="DOWN";
+  var who=m?m.cs+(m.star?" ★":""):"man";
+  tick(sq.name+": "+who+" down — "+why,"bad",true);
+  S.receipts.push("▼ "+sq.name+" — "+who+" hit: "+why);
+  if (m && sq.hp===1 && sq.player){
+    var last2=sq.crew.filter(function(m2){return m2.st==="OK";})[0];
+    if (last2) tick(last2.cs+" is the last one standing","bad",true);
+  }
   if (sq.hp<=0){ sq.phase="DOWN"; sq.pt=20; sq.morale=Math.max(0.5,sq.morale-0.2);
     if (sq.player) S.cue=null;
     tick(sq.name+" COMBAT INEFFECTIVE — extracting under fire","bad",true);
@@ -407,7 +437,7 @@ var REQ_POOLS={
         function(sq){S.req-=80;sq.prog+=30;tick("141: charges set — ahead of schedule","up");},
         function(sq){tick("141: copy — slow way then","team");}],
       ["CAS DANGER-CLOSE","−1 cas",function(){return S.cas>0;},
-        function(sq){S.cas--;blast(sq.x,sq.y,8,0.5);sq.heat=0;tick("CAS in — danger close","up",true);},
+        function(sq){S.cas--;blast(sq.x,sq.y,8,0.5);sq.heat=0;S.mon={kind:"CAS",label:"CAS RUN",t:0,dur:3.5};tick("CAS in — danger close","up",true);},
         function(sq){sq.prog=Math.max(0,sq.prog-15);tick("141: no air — breaking contact","team");}]],
   SR:[["APPROVE BRIBE","−100 req",function(){return S.req>=100;},
         function(sq){S.req-=100;sq.prog+=35;tick("141: asset paid — doors open","up");},
@@ -425,7 +455,7 @@ var REQ_POOLS={
         function(sq){S.req-=120;blast(sq.x,sq.y,6,0.35);tick("141: locals armed — line surging","up");},
         function(sq){tick("141: holding with what we have","team");}],
       ["CAS DANGER-CLOSE","−1 cas",function(){return S.cas>0;},
-        function(sq){S.cas--;blast(sq.x,sq.y,8,0.5);sq.heat=0;tick("CAS in — danger close","up",true);},
+        function(sq){S.cas--;blast(sq.x,sq.y,8,0.5);sq.heat=0;S.mon={kind:"CAS",label:"CAS RUN",t:0,dur:3.5};tick("CAS in — danger close","up",true);},
         function(sq){sq.prog=Math.max(0,sq.prog-15);}]],
 };
 function raiseRequest(sq){
@@ -455,16 +485,19 @@ function fireLAOE(kind){
   if (!tgt){ tick("no target mass for strike","team"); return false; }
   if (kind==="MECHA"){
     S.mechaUnit={x:tgt.x,y:tgt.y,t:0};
+    S.mon={kind:"MECHA",label:"MECHA DROP",t:0,dur:4};
     tick("MECHA DROP — clearing the grid square","up",true); mark("MEC",true);
     S.receipts.push("◈ MECHA deployed @ front — area cleared and held");
   } else if (kind==="TOMAHAWK"){
     strike(tgt.x,tgt.y,10,0.7);
     tick("TOMAHAWK impact — terrain cratered","up",true); mark("TMH",true);
     S.receipts.push("◈ TOMAHAWK strike (1 MAT)");
+    S.mon={kind:"KIN",label:"TOMAHAWK",t:0,dur:4};
   } else {
     strike(tgt.x,tgt.y,16,0.9);
     tick("ORBITAL LANCE — the map remembers this","up",true); mark("ORB",true);
     S.receipts.push("◈ ORBITAL strike (3 MAT)");
+    S.mon={kind:"KIN",label:"ORBITAL LANCE",t:0,dur:4.5};
   }
   return true;
 }
@@ -479,6 +512,7 @@ function advance(dt){
   S.squads.forEach(function(sq){ squadTick(sq,dt); });
   mechaTick(dt);
   if (S.cue){ S.cue.left-=dt; if (S.cue.left<=0){ S.cue.no(S.cue.sq); S.cue=null; } }
+  if (S.mon){ S.mon.t+=dt; if (S.mon.t>=S.mon.dur) S.mon=null; }
   S.req+=dt*2;
   S.tide=tideCalc(); S.hist.push(S.tide);
   if (S.t<=0 || Math.abs(S.tide)>0.55) end();
@@ -488,8 +522,12 @@ function end(){
   var v=S.tide>0.25?"LANDSLIDE — THEATRE TAKEN":S.tide>0?"MARGINAL HOLD":
         S.tide>-0.25?"MARGINAL LOSS":"COLLAPSE";
   document.getElementById("verdict").textContent=v;
+  var roster=S.squads[0].crew.map(function(m){
+    return (m.st==="OK"?"▮":"▯")+" "+m.cs+(m.star?" ★":"")+" — "+m.ops+" op"+(m.ops===1?"":"s");
+  }).join("\n");
   document.getElementById("receipts").innerHTML=
     "FINAL TIDE "+(S.tide*100).toFixed(0)+"% · REQ "+(S.req|0)+" · CAS "+S.cas+" · MAT "+S.mat
+    +"\n\n<b>141 ROSTER</b>\n"+roster
     +"\n\n"+(S.receipts.length?S.receipts.join("\n"):"(no operations)");
   document.getElementById("debrief").classList.add("on");
 }
@@ -609,7 +647,64 @@ function flushFeed(){
 }
 
 /* ============ pixel-people force readout ============ */
+/* OP-MONITOR: when an action fires, this canvas becomes the action —
+   micro press translating into a macro event, drawn in the action's own idiom. */
+function drawMonitor(){
+  var W=fcC.width, H=fcC.height, d=window.devicePixelRatio||1;
+  var m=S.mon, p=Math.min(1,m.t/m.dur);
+  fctx.clearRect(0,0,W,H);
+  fctx.font=(8*d)+"px monospace"; fctx.textBaseline="top";
+  fctx.fillStyle="#8a8778"; fctx.textAlign="left";
+  fctx.fillText("OP-MONITOR // "+m.label,6*d,5*d);
+  var pad=10*d;
+  if (m.kind==="KIN"){
+    // launch arc: pad bottom-left → apex → target bottom-right, staged like a flight plan
+    var x0=pad, y0=H-pad, x1=W-pad, y1=H-pad*1.4, cxq=W*0.42, cyq=pad*1.6;
+    fctx.strokeStyle="#34343c"; fctx.setLineDash([3*d,3*d]);
+    fctx.beginPath(); fctx.moveTo(x0,y0); fctx.quadraticCurveTo(cxq,cyq,x1,y1); fctx.stroke();
+    fctx.setLineDash([]);
+    var tt=p, ix=(1-tt)*(1-tt)*x0+2*(1-tt)*tt*cxq+tt*tt*x1,
+             iy=(1-tt)*(1-tt)*y0+2*(1-tt)*tt*cyq+tt*tt*y1;
+    fctx.strokeStyle="#e8e4d8"; fctx.lineWidth=Math.max(1,d);
+    fctx.beginPath(); fctx.moveTo(x0,y0);
+    for (var s4=0;s4<=20;s4++){ var q=s4/20*tt;
+      fctx.lineTo((1-q)*(1-q)*x0+2*(1-q)*q*cxq+q*q*x1,(1-q)*(1-q)*y0+2*(1-q)*q*cyq+q*q*y1); }
+    fctx.stroke();
+    fctx.fillStyle="#ffb63d"; fctx.fillRect(ix-1.5*d,iy-1.5*d,3*d,3*d);
+    var stg = p<0.2?"LAUNCH": p<0.55?"ASCENT": p<0.85?"TERMINAL":"IMPACT";
+    fctx.fillStyle="#e8e4d8"; fctx.textAlign="right"; fctx.fillText(stg,W-6*d,5*d);
+    if (p>0.85){ fctx.strokeStyle="#ffb63d";
+      fctx.beginPath(); fctx.arc(x1,y1,(p-0.85)/0.15*12*d,0,Math.PI*2); fctx.stroke(); }
+  } else if (m.kind==="MECHA"){
+    // drop line: chassis descends the gauge, stages called on the way down
+    var dx=W*0.5, top=pad*2, bot=H-pad, my=top+(bot-top)*p;
+    fctx.strokeStyle="#34343c"; fctx.setLineDash([3*d,3*d]);
+    fctx.beginPath(); fctx.moveTo(dx,top); fctx.lineTo(dx,bot); fctx.stroke(); fctx.setLineDash([]);
+    fctx.strokeStyle="#d8ff3d"; fctx.lineWidth=Math.max(1,d);
+    fctx.strokeRect(dx-5*d,my-6*d,10*d,9*d);                     // hull
+    fctx.strokeRect(dx-2*d,my-9*d,4*d,3*d);                      // head
+    var stg2 = p<0.3?"DROP": p<0.65?"ENTRY": p<0.9?"RETRO":"GROUND";
+    fctx.fillStyle="#e8e4d8"; fctx.textAlign="right"; fctx.fillText(stg2,W-6*d,5*d);
+    if (p>0.9){ fctx.strokeStyle="#ffb63d";
+      fctx.beginPath(); fctx.arc(dx,bot,(p-0.9)/0.1*14*d,0,Math.PI,true); fctx.stroke(); }
+  } else { // CAS: pilot HUD, reticle converging on the mark
+    var cx2=W/2, cy2=H/2+3*d, rr=(1-p*0.55)*Math.min(W,H)*0.32;
+    fctx.strokeStyle="#d8ff3d"; fctx.lineWidth=Math.max(1,d);
+    fctx.beginPath(); fctx.arc(cx2,cy2,rr,0.15,Math.PI-0.15); fctx.stroke();
+    fctx.beginPath(); fctx.arc(cx2,cy2,rr,Math.PI+0.15,Math.PI*2-0.15); fctx.stroke();
+    fctx.beginPath();
+    fctx.moveTo(cx2-rr*1.3,cy2); fctx.lineTo(cx2-rr*0.6,cy2);
+    fctx.moveTo(cx2+rr*0.6,cy2); fctx.lineTo(cx2+rr*1.3,cy2);
+    fctx.moveTo(cx2,cy2-rr*0.6); fctx.lineTo(cx2,cy2-rr*0.25);
+    fctx.stroke();
+    fctx.fillStyle=p>0.7?"#ffb63d":"#d8ff3d";
+    fctx.fillRect(cx2-1.5*d,cy2-1.5*d,3*d,3*d);
+    var stg3 = p<0.35?"INBOUND": p<0.7?"ON APPROACH":"GUNS GUNS GUNS";
+    fctx.fillStyle="#e8e4d8"; fctx.textAlign="right"; fctx.fillText(stg3,W-6*d,5*d);
+  }
+}
 function drawForces(){
+  if (S.mon){ drawMonitor(); return; }
   var W=fcC.width, H=fcC.height, d=window.devicePixelRatio||1;
   fctx.clearRect(0,0,W,H);
   var u=Math.max(2,Math.round(2*d));            // 1 voxel unit
@@ -654,6 +749,19 @@ function drawForces(){
   for (var cc=0;cc<S.cas;cc++){ missile(kx,y3+2*d,"#8a8778"); kx+=u*3; }
 }
 
+/* one operative = one doll. outline holds while they stand; goes dim when down;
+   promoted operatives get the amber head. */
+function doll(m,player){
+  var col = m.st==="OK" ? (player?"#e8e4d8":"#d8ff3d") : "#3c3c44";
+  var head = m.star&&m.st==="OK" ? "#ffb63d" : col;
+  return '<svg width="11" height="13" viewBox="0 0 11 13" style="vertical-align:middle">'
+    +'<rect x="3.5" y="0.5" width="4" height="3" fill="none" stroke="'+head+'"/>'
+    +'<rect x="2.5" y="4.5" width="6" height="4" fill="none" stroke="'+col+'"/>'
+    +'<rect x="0.5" y="4.5" width="1" height="3.4" fill="none" stroke="'+col+'"/>'
+    +'<rect x="9.5" y="4.5" width="1" height="3.4" fill="none" stroke="'+col+'"/>'
+    +'<rect x="3" y="9.5" width="1.4" height="3" fill="none" stroke="'+col+'"/>'
+    +'<rect x="6.6" y="9.5" width="1.4" height="3" fill="none" stroke="'+col+'"/></svg>';
+}
 function renderDeck(){
   var st=[["TIDE",(S.tide>=0?"+":"")+(S.tide*100|0)+"%",S.tide<0],
           ["REQ",S.req|0,S.req<80]];
@@ -664,7 +772,7 @@ function renderDeck(){
   var blu=S.squads.filter(function(q){return q.side>0;});
   var hos=S.squads.filter(function(q){return q.side<0 && q.phase!=="DOWN";}).length;
   document.getElementById("squads").innerHTML = blu.map(function(q){
-    var pips=""; for (var k=0;k<4;k++) pips+= k<q.hp?"<b>▮</b>":"<span>▯</span>";
+    var pips=q.crew.map(function(m){ return doll(m,q.player); }).join("");
     var st2=q.phase==="WORK" ? q.op.name+" "+(q.prog|0)+"%"
           : q.phase==="INSERT" ? "→ "+q.op.name
           : q.phase;
