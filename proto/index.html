@@ -47,7 +47,8 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 /* ticker: IMPORTANT events only */
 #ticker{flex:none;border:1px solid var(--amber);background:var(--bg);
   overflow:hidden;height:22px;position:relative}
-#tickin{position:absolute;left:0;top:0;white-space:nowrap;line-height:22px;font-size:11px;
+#tickwrap{position:absolute;inset:0}
+#tickwrap .tkin{position:absolute;left:0;top:0;white-space:nowrap;line-height:22px;font-size:11px;
   will-change:transform}
 #tickin .up{color:var(--us)} #tickin .bad{color:var(--foe)} #tickin .rq{color:var(--amber)}
 #tickin .sep{color:var(--line);padding:0 8px}
@@ -122,7 +123,7 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
     </div>
   </div>
   <div id="mapwrap" class="panel"><span class="ph">THEATRE — tap to designate 141's objective</span><canvas id="map"></canvas></div>
-  <div id="ticker"><div id="tickin"></div></div>
+  <div id="ticker"><div id="tickwrap"></div></div>
   <div id="midrow">
     <div id="tickers">
       <div class="tk" id="tkA"><span class="slot">A<span class="badge"></span></span><div class="tape"></div></div>
@@ -626,18 +627,25 @@ function renderTrend(){
 }
 
 /* ============ ticker (important) + two-line stepping overview ============ */
-/* marquees are driven from rAF, not CSS keyframes: a JS-measured content width
-   and a per-frame offset wrap cleanly with no snap at the loop point, which the
-   percentage-transform keyframe trick could not guarantee on every browser. */
+/* true single-flow marquee: two identical copies placed exactly one content-width
+   apart, both driven by the same offset. When the lead copy exits, the trailing
+   copy is already sitting at position 0 — no seam, no snap, just one flow. */
 var MQ={ main:{w:0,off:0,speed:32}, A:{w:0,off:0,speed:26}, B:{w:0,off:0,speed:26},
          C:{w:0,off:0,speed:26}, D:{w:0,off:0,speed:26} };
+function mqFill(wrap,html){
+  wrap.innerHTML='<div class="tkin"></div><div class="tkin"></div>';
+  wrap.children[0].innerHTML=html; wrap.children[1].innerHTML=html;
+  return wrap.children[0].scrollWidth;
+}
 function tickMarquees(dt){
   ["main","A","B","C","D"].forEach(function(key){
     var m=MQ[key]; if (m.w<=0) return;
     m.off+=m.speed*dt; if (m.off>=m.w) m.off-=m.w;
-    var el = key==="main" ? document.getElementById("tickin")
-                          : document.querySelector("#tk"+key+" .tkin");
-    if (el) el.style.transform="translateX(-"+m.off+"px)";
+    var wrap = key==="main" ? document.getElementById("tickwrap")
+                            : document.querySelector("#tk"+key+" .tape");
+    if (!wrap || wrap.children.length<2) return;
+    wrap.children[0].style.transform="translateX(-"+m.off+"px)";
+    wrap.children[1].style.transform="translateX("+(m.w-m.off)+"px)";
   });
 }
 var ticks=[];
@@ -647,9 +655,7 @@ function tick(m,cls,important){
     var html=ticks.map(function(t2){
       return '<span class="'+t2.cls+'">'+t2.m+'</span>'; }).join('<span class="sep">◆</span>')
       +'<span class="sep">◆</span>';
-    var el=document.getElementById("tickin");
-    el.innerHTML=html+html;
-    MQ.main.w=el.scrollWidth/2; MQ.main.off=0;
+    MQ.main.w=mqFill(document.getElementById("tickwrap"),html); MQ.main.off=0;
   }
 }
 
@@ -784,10 +790,8 @@ function tkSet(idx,items,hot,badge){
   tkLast[idx]=text;
   var html=items.map(function(t2){return '<span>'+t2+'</span>';}).join('<span class="sep">◆</span>')
     +'<span class="sep">◆</span>';
-  var tape=el.querySelector(".tape");
-  tape.innerHTML='<div class="tkin">'+html+html+'</div>';
-  var kin=tape.querySelector(".tkin");
-  MQ[tkLetters[idx]].w=kin.scrollWidth/2; MQ[tkLetters[idx]].off=0;
+  var key=tkLetters[idx];
+  MQ[key].w=mqFill(el.querySelector(".tape"),html); MQ[key].off=0;
 }
 function renderTickers(){
   var q=me();
