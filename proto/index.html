@@ -48,8 +48,7 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 #ticker{flex:none;border:1px solid var(--amber);background:var(--bg);
   overflow:hidden;height:22px;position:relative}
 #tickin{position:absolute;left:0;top:0;white-space:nowrap;line-height:22px;font-size:11px;
-  will-change:transform;animation:tk linear infinite}
-@keyframes tk{to{transform:translateX(-50%)}}
+  will-change:transform}
 #tickin .up{color:var(--us)} #tickin .bad{color:var(--foe)} #tickin .rq{color:var(--amber)}
 #tickin .sep{color:var(--line);padding:0 8px}
 /* mid row: ticker A-D (slot informatics, left) + OP-MONITOR (right) */
@@ -64,8 +63,7 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 .tk .badge{font-size:9px;color:var(--ink);font-variant-numeric:tabular-nums}
 .tk .tape{flex:1;position:relative;overflow:hidden;min-width:0}
 .tk .tkin{position:absolute;left:0;top:0;height:100%;display:flex;align-items:center;
-  white-space:nowrap;font-size:10px;color:var(--dim);padding:0 8px;
-  will-change:transform;animation:tk linear infinite}
+  white-space:nowrap;font-size:10px;color:var(--dim);padding:0 8px;will-change:transform}
 .tk .tkin b{color:var(--ink);font-weight:400}
 .tk .tkin .sep{color:var(--line);padding:0 8px}
 .tk.hot .slot{color:var(--amber);border-color:var(--amber)} .tk.hot .tkin b{color:var(--amber)}
@@ -628,18 +626,30 @@ function renderTrend(){
 }
 
 /* ============ ticker (important) + two-line stepping overview ============ */
+/* marquees are driven from rAF, not CSS keyframes: a JS-measured content width
+   and a per-frame offset wrap cleanly with no snap at the loop point, which the
+   percentage-transform keyframe trick could not guarantee on every browser. */
+var MQ={ main:{w:0,off:0,speed:32}, A:{w:0,off:0,speed:26}, B:{w:0,off:0,speed:26},
+         C:{w:0,off:0,speed:26}, D:{w:0,off:0,speed:26} };
+function tickMarquees(dt){
+  ["main","A","B","C","D"].forEach(function(key){
+    var m=MQ[key]; if (m.w<=0) return;
+    m.off+=m.speed*dt; if (m.off>=m.w) m.off-=m.w;
+    var el = key==="main" ? document.getElementById("tickin")
+                          : document.querySelector("#tk"+key+" .tkin");
+    if (el) el.style.transform="translateX(-"+m.off+"px)";
+  });
+}
 var ticks=[];
 function tick(m,cls,important){
   if (important){
     ticks.unshift({m:m,cls:cls||""}); if (ticks.length>6) ticks.pop();
-    // seamless marquee: content doubled, animate -50%, speed from length
     var html=ticks.map(function(t2){
       return '<span class="'+t2.cls+'">'+t2.m+'</span>'; }).join('<span class="sep">◆</span>')
       +'<span class="sep">◆</span>';
     var el=document.getElementById("tickin");
     el.innerHTML=html+html;
-    var chars=ticks.reduce(function(a,t2){return a+t2.m.length+3;},0);
-    el.style.animationDuration=Math.max(14,chars*0.35)+"s";
+    MQ.main.w=el.scrollWidth/2; MQ.main.off=0;
   }
 }
 
@@ -776,8 +786,8 @@ function tkSet(idx,items,hot,badge){
     +'<span class="sep">◆</span>';
   var tape=el.querySelector(".tape");
   tape.innerHTML='<div class="tkin">'+html+html+'</div>';
-  var chars=items.reduce(function(a,t2){return a+t2.replace(/<[^>]+>/g,"").length+3;},0);
-  tape.querySelector(".tkin").style.animationDuration=Math.max(8,chars*0.28)+"s";
+  var kin=tape.querySelector(".tkin");
+  MQ[tkLetters[idx]].w=kin.scrollWidth/2; MQ[tkLetters[idx]].off=0;
 }
 function renderTickers(){
   var q=me();
@@ -900,6 +910,7 @@ function loop(now){
   advance(dt);
   for (var k=0;k<5;k++) if (S.arm[k]>0){ S.arm[k]-=dt; if (S.arm[k]<=0){S.arm[k]=0; renderButtons();} }
   renderMap(); renderTrend(); renderDeck();
+  tickMarquees(dt);
   requestAnimationFrame(loop);
 }
 fit(mapC); fit(trC); fit(fcC); reset(); requestAnimationFrame(loop);
