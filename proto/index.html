@@ -345,7 +345,7 @@ function fortScan(){
         if (e.t>=5){
           delete S.build[b2];
           var nm=(s>0?"FOB ":"REDOUBT ")+bname({x:bx,y:by});
-          S.forts.push({x:bx*BW+BW/2, y:by*BW+BW/2, side:s, hp:10, r:6, name:nm});
+          S.forts.push({x:bx*BW+BW/2, y:by*BW+BW/2, side:s, hp:10, r:6, name:nm, garrison:3});
           tick(nm+" established — "+(s>0?"line anchored":"they are dug in"),
                s>0?"up":"bad", true);
           S.receipts.push((s>0?"◈ ":"▼ ")+nm+" raised");
@@ -357,12 +357,19 @@ function fortScan(){
       }
     });
   }
-  // erosion: enemy troops inside the perimeter dismantle it
+  // sentries return fire on intruders; erosion chews the garrison before the walls
   for (var f4=S.forts.length-1;f4>=0;f4--){
-    var f5=S.forts[f4], enemies=0;
+    var f5=S.forts[f4], intruders=[];
     for (var k2=0;k2<S.troops.length;k2++){ var tr2=S.troops[k2];
-      if (tr2.dead<=0 && tr2.side!==f5.side && Math.hypot(tr2.x-f5.x,tr2.y-f5.y)<f5.r) enemies++; }
-    if (enemies>0) f5.hp-=enemies*0.12;
+      if (tr2.dead<=0 && tr2.side!==f5.side && Math.hypot(tr2.x-f5.x,tr2.y-f5.y)<f5.r) intruders.push(tr2); }
+    if (intruders.length){
+      for (var s5=0;s5<intruders.length && s5<Math.ceil(f5.garrison);s5++){
+        if (Math.random()<0.35){ intruders[s5].dead=3+Math.random()*4;
+          if (intruders[s5].side>0) S.kiaB++; else S.kiaO++; }
+      }
+      if (f5.garrison>0) f5.garrison-=intruders.length*0.08;
+      else f5.hp-=intruders.length*0.12;
+    } else if (f5.garrison<3) f5.garrison=Math.min(3,f5.garrison+0.05);  // quiet watch rebuilds
     if (f5.hp<=0){
       S.forts.splice(f4,1);
       tick(f5.name+" overrun — position dismantled", f5.side>0?"bad":"up", true);
@@ -451,7 +458,15 @@ function bname(b){ return String.fromCharCode(65+b.y)+"-"+(b.x+1); }
 /* ============ line troops: the default force. they ARE the push ============ */
 function troopTick(tr,dt){
   if (tr.dead>0){ tr.dead-=dt;
-    if (tr.dead<=0){ var nt=mkTroop(tr.side); tr.x=nt.x; tr.y=nt.y; }
+    if (tr.dead<=0){
+      // auxiliaries: forts are forward muster points — a share of replacements
+      // enter the war at the fort line instead of walking from the map edge
+      var fts=S.forts.filter(function(f){return f.side===tr.side&&f.garrison>0;});
+      if (fts.length && Math.random()<0.45){
+        var f0=fts[(Math.random()*fts.length)|0];
+        tr.x=f0.x+(Math.random()-0.5)*f0.r; tr.y=f0.y+(Math.random()-0.5)*f0.r;
+      } else { var nt=mkTroop(tr.side); tr.x=nt.x; tr.y=nt.y; }
+    }
     return; }
   var i=(tr.y|0)*GW+(tr.x|0);
   var here=(i>=0&&i<N)?S.c[i]:0;
@@ -862,6 +877,11 @@ function renderMap(){
     mctx.fillText(f9.name,fx2,fy2-fr2*0.7-2*d);
     mctx.fillStyle="rgba("+col9+",.5)";
     mctx.fillRect(fx2-fr2*0.7,fy2+fr2*0.7+2*d,fr2*1.4*Math.max(0,f9.hp/10),1.5*d);
+    // sentry pips on the wall — the garrison you can watch get whittled
+    for (var g9=0;g9<Math.ceil(f9.garrison);g9++){
+      mctx.fillStyle="rgba("+col9+",.95)";
+      mctx.fillRect(fx2-fr2*0.5+g9*fr2*0.5,fy2-fr2*0.7-1*d,2*d,2*d);
+    }
   });
   if (S.mechaUnit){
     var m=S.mechaUnit, mx=m.x*sx, my=m.y*sy;
