@@ -3,11 +3,14 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
-<title>WORKBENCH // reactor proto</title>
+<title>WARCLOCK // ARSENAL BENCH</title>
 <style>
+/* Arsenal bench v2 — frequency-mixing tuner. Each weapon has a target spectrum
+   (its formula); you shape a mix of oscillator channels to match it. Fit rating
+   burns into the shared profile, and the theatre reads it as real weapon stats. */
 :root{
   --bg:#17171b; --panel:#1e1e24; --ink:#e8e4d8; --dim:#8a8778; --line:#34343c;
-  --us:#d8ff3d; --foe:#ff5a2a; --amber:#ffb63d; --navy:#3d5a80;
+  --us:#d8ff3d; --foe:#ff5a2a; --amber:#ffb63d;
   --mono:"SF Mono",ui-monospace,"Cascadia Mono","Roboto Mono",Consolas,monospace;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0}
@@ -16,482 +19,224 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
   font-family:var(--mono);font-size:12px;line-height:1.35;
   -webkit-user-select:none;user-select:none;overscroll-behavior:none;display:flex;justify-content:center}
 @supports (height:100dvh){ html,body{height:100dvh} }
-#device{width:100%;max-width:460px;height:100%;display:flex;flex-direction:column;gap:6px;
-  padding:calc(6px + env(safe-area-inset-top)) 10px calc(8px + env(safe-area-inset-bottom))}
-.panel{border:1px solid var(--line);background:var(--panel);position:relative}
-.panel>.ph{position:absolute;top:-1px;left:8px;transform:translateY(-50%);
-  background:var(--bg);padding:0 6px;font-size:9px;letter-spacing:.18em;color:var(--dim)}
+#device{width:100%;max-width:460px;height:100%;overflow:hidden;display:flex;flex-direction:column;gap:8px;
+  padding:calc(8px + env(safe-area-inset-top)) 10px calc(10px + env(safe-area-inset-bottom))}
+.card{border:1px solid var(--line);background:var(--panel);border-radius:5px;
+  display:flex;flex-direction:column;overflow:hidden}
+.card>.ph{flex:none;padding:6px 10px 3px;font-size:9px;letter-spacing:.18em;color:var(--dim)}
 
-/* top: three 5x3 voxel blocks + the infomatics readout beneath them */
-#gauges{height:28%;flex:none;padding:10px 10px 8px;display:flex;flex-direction:column;gap:8px}
-#gblocks{flex:1;display:flex;gap:14px;align-items:center;min-height:0}
-.gset{flex:1;display:flex;flex-direction:column;gap:3px;min-width:0;justify-content:center}
-.gset .gl{color:var(--dim);font-size:9px;letter-spacing:.12em;text-align:center}
-/* 1:1 voxels — width drives the grid, height follows via aspect-ratio,
-   auto-flow wraps 15 cells into 3 rows of 5 without forcing a stretch */
-.grow{display:grid;grid-template-columns:repeat(5,1fr);gap:3px}
-.cell{aspect-ratio:1;width:100%;background:#26262c;border:1px solid #313138;position:relative}
-.cell.g{background:var(--us);opacity:.82}
-.cell.n{background:var(--navy);opacity:.75}
-.cell.r{background:var(--foe);opacity:.85}
-.cell.op::after{content:"";position:absolute;inset:-3px;border:2px solid var(--ink)}
-.cell.blink{animation:bk .5s steps(2) infinite}
-@keyframes bk{50%{opacity:.15}}
+#top{display:flex;gap:8px;align-items:baseline;padding:0 2px;color:var(--dim);font-size:11px;letter-spacing:.08em}
+#top b{color:var(--ink);font-weight:400}
+#top .link{margin-left:auto;font-size:10px}
 
-/* middle 60%: workbench */
-#bench{flex:1;padding:12px 8px 8px;display:flex;flex-direction:column;gap:6px}
-#schem{flex:1;width:100%;display:block;touch-action:none}
-#oprow{display:flex;gap:10px;align-items:center;padding:0 4px}
-#oprow .gl{color:var(--dim);font-size:9px;letter-spacing:.12em;white-space:nowrap}
-#op{flex:1;-webkit-appearance:none;appearance:none;height:22px;background:transparent}
-#op::-webkit-slider-runnable-track{height:4px;background:var(--line)}
-#op::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;margin-top:-9px;
-  background:var(--bg);border:2px solid var(--us)}
-#opv{color:var(--us);font-variant-numeric:tabular-nums;width:38px;text-align:right}
+/* weapon select: one card per arsenal item */
+#weapons{flex:none;display:flex;gap:6px}
+.wpn{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:5px;color:var(--ink);
+  font-family:var(--mono);font-size:11px;letter-spacing:.04em;padding:7px 8px;text-align:left;
+  display:flex;flex-direction:column;gap:2px;touch-action:manipulation}
+.wpn .k{font-size:9px;color:var(--dim);letter-spacing:.14em}
+.wpn .mk{font-size:10px;color:var(--dim)}
+.wpn.on{border-color:var(--us)} .wpn.on .k{color:var(--us)}
 
-/* middle 52%: workbench only — clean */
-/* bottom 20%: message + picker + actions */
-#deck{height:20%;flex:none;padding:10px 8px 8px;display:flex;flex-direction:column;gap:5px;overflow:hidden}
-#stats{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;flex:none}
-.stat{border:1px solid var(--line);padding:2px 5px;background:var(--bg);text-align:center}
-.stat .k{color:var(--dim);font-size:8px;letter-spacing:.1em}
-.stat .v{font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap}
-.stat.low .v{color:var(--foe)}
-#msg{flex:1;color:var(--dim);font-size:11px;white-space:pre-wrap;overflow:hidden;padding:0 2px}
-#msg b{color:var(--ink);font-weight:400} #msg .up{color:var(--us)} #msg .bad{color:var(--foe)} #msg .rq{color:var(--amber)}
-#actions{display:flex;gap:6px}
-#actions button{flex:1;padding:10px;font-family:var(--mono);font-size:12px;letter-spacing:.12em;
-  background:var(--bg);border:1px solid var(--line);color:var(--ink);touch-action:manipulation}
-#btnspin{border-color:var(--us);color:var(--us)}
-#actions button:active{background:var(--ink);color:var(--bg)}
-#actions button[disabled]{opacity:.3}
-#picker{display:none;flex-direction:column;gap:4px;flex:1}
-#picker.on{display:flex}
-#deck.picking #msg{display:none}
-.pick{display:flex;justify-content:space-between;background:var(--bg);border:1px solid var(--line);
-  color:var(--ink);font-family:var(--mono);font-size:12px;padding:7px 10px;touch-action:manipulation}
-.pick.sel{border-color:var(--us)}
-.pick.locked{opacity:.32}
-.pick .d{color:var(--dim);font-size:10px}
-.pick:active{background:var(--ink);color:var(--bg)}
+/* spectral display: the high-resolution gauge */
+#specwrap{flex:1.2;min-height:0;padding:0 8px 8px}
+#spec{width:100%;height:100%;display:block}
+
+/* mixer: 4 oscillator channel cards */
+#mixer{flex:1.4;min-height:0;display:flex;flex-direction:column;gap:6px;overflow-y:auto;
+  -webkit-overflow-scrolling:touch;overscroll-behavior:contain;scrollbar-width:none}
+#mixer::-webkit-scrollbar{display:none}
+.ch{flex:none;border:1px solid var(--line);background:var(--panel);border-radius:5px;padding:6px 9px;
+  display:grid;grid-template-columns:34px 1fr 1fr 1fr;gap:8px;align-items:center}
+.ch .nm{font-size:11px;letter-spacing:.1em;color:var(--us)}
+.ch.mute .nm{color:var(--line)}
+.param{display:flex;flex-direction:column;gap:2px;min-width:0}
+.param .pk{font-size:8px;color:var(--dim);letter-spacing:.14em}
+.param .row{display:flex;align-items:center;gap:4px}
+.param button{width:26px;height:24px;background:var(--bg);border:1px solid var(--line);color:var(--ink);
+  font-family:var(--mono);font-size:13px;border-radius:3px;touch-action:manipulation;flex:none}
+.param button:active{background:var(--ink);color:var(--bg)}
+.param .pv{flex:1;text-align:center;font-size:11px;font-variant-numeric:tabular-nums}
+
+/* commit row */
+#commit{flex:none;display:flex;gap:8px;align-items:stretch}
+#fit{width:38%;flex:none;border:1px solid var(--line);background:var(--panel);border-radius:5px;
+  padding:6px 10px;display:flex;flex-direction:column;justify-content:center}
+#fit .k{font-size:9px;color:var(--dim);letter-spacing:.14em}
+#fit .v{font-size:20px;font-variant-numeric:tabular-nums}
+#burn{flex:1;background:var(--panel);border:1px solid var(--us);color:var(--us);border-radius:5px;
+  font-family:var(--mono);font-size:13px;letter-spacing:.1em;touch-action:manipulation}
+#burn:active{background:var(--us);color:var(--bg)}
+#burn.armed{border-color:var(--amber);color:var(--amber)}
+#burn[disabled]{opacity:.3}
+#note{flex:none;font-size:10px;color:var(--dim);padding:0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 </style>
 </head>
 <body>
 <main id="device">
-  <section id="gauges" class="panel"><span class="ph">ENVELOPE — load 10→90%</span>
-    <div id="gblocks">
-      <div class="gset"><span class="gl">OUTPUT</span><div class="grow" id="g0"></div></div>
-      <div class="gset"><span class="gl">THERMAL</span><div class="grow" id="g1"></div></div>
-      <div class="gset"><span class="gl">STABILITY</span><div class="grow" id="g2"></div></div>
-    </div>
-    <div id="stats"></div>
-  </section>
-
-  <section id="bench" class="panel"><span class="ph">WORKBENCH — REACTOR MK I</span>
-    <canvas id="schem"></canvas>
-    <div id="oprow"><span class="gl">OPERATING POINT</span>
-      <input type="range" id="op" min="10" max="90" value="50" />
-      <span id="opv">50%</span></div>
-  </section>
-
-  <section id="deck" class="panel"><span class="ph">DECK</span>
-    <div id="msg">tap a station on the schematic to refit it.\nSPIN UP costs 1 test article.</div>
-    <div id="picker"></div>
-    <div id="actions">
-      <button id="btnreturn" style="display:none">◂ RETURN</button>
-      <button id="btnenter" style="display:none">ENTER ▸</button>
-      <button id="btnacq">+ ACQUIRE</button>
-      <button id="btnspin">▸ SPIN UP</button>
-    </div>
-  </section>
+  <div id="top"><b>ARSENAL BENCH</b><span>frequency lab</span><span class="link" id="proflink">—</span></div>
+  <div id="weapons">
+    <button class="wpn" id="w0"></button><button class="wpn" id="w1"></button><button class="wpn" id="w2"></button>
+  </div>
+  <div class="card" id="specwrap"><span class="ph">SPECTRUM — shape the mix onto the target curve</span><canvas id="spec"></canvas></div>
+  <div id="mixer"></div>
+  <div id="commit">
+    <div id="fit"><span class="k">FIT</span><span class="v" id="fitv">0%</span></div>
+    <button id="burn">BURN-IN CALIBRATION</button>
+  </div>
+  <div id="note">fit burns into the command profile — the theatre reads it as live weapon performance</div>
 </main>
 
 <script>
 "use strict";
-/* ============ components: few parts, strong couplings ============ */
-var LIB = {
-  CORE:      [{n:"SALVAGE CORE", d:"pow 6 · tame",    pow:6,  heat:1.0, stab:0.75},
-              {n:"MIL REACTOR",  d:"pow 10 · warm",   pow:10, heat:1.35,stab:0.9},
-              {n:"OVERCLOCK",    d:"pow 15 · angry",  pow:15, heat:1.9, stab:0.5}],
-  INJECTOR:  [{n:"LEAN FEED",    d:"×1.0 · cool",     boost:1.0, heat:0.9, stab:0.1},
-              {n:"RICH FEED",    d:"×1.25 · hot",     boost:1.25,heat:1.35,stab:0},
-              {n:"PULSE FEED",   d:"×1.5 · unstable", boost:1.5, heat:1.6, stab:-0.18}],
-  COOLANT:   [{n:"PASSIVE FINS", d:"cool ×1 · free",  cool:1.0, drag:0},
-              {n:"LOOP PUMP",    d:"cool ×1.6 · drag",cool:1.6, drag:0.06},
-              {n:"CRYO LOOP",    d:"cool ×2.3 · heavy drag", cool:2.3, drag:0.14}],
-  EXCHANGER: [{n:"MESH",         d:"relief 2",        relief:2, drag:0.02},
-              {n:"PLATE STACK",  d:"relief 4",        relief:4, drag:0.06},
-              {n:"VAPOR CHAMBER",d:"relief 7 · drag", relief:7, drag:0.12}],
-  GOVERNOR:  [{n:"NONE",         d:"raw output",      eff:1.0,  damp:0},
-              {n:"ANALOG",       d:"damped · −5% out",eff:0.95, damp:0.2},
-              {n:"ADAPTIVE",     d:"stable · −10% out",eff:0.9, damp:0.4}],
-};
-var ORDER=["CORE","INJECTOR","COOLANT","EXCHANGER","GOVERNOR"];
-/* inventory: how many of each part you own. key = station+":"+index.
-   fitting a part is free (reusable); you just can't slot what you don't own.
-   start with the tame parts; the hot/rare ones must be acquired. */
-var STOCK={};
-function stockKey(s,k){ return s+":"+k; }
-function initStock(){
-  STOCK={};
-  ORDER.forEach(function(s){ STOCK[stockKey(s,0)]=2; });        // basic tier owned
-  STOCK[stockKey("CORE",1)]=1; STOCK[stockKey("EXCHANGER",1)]=1; // a couple mid parts
-}
-function owned(s,k){ return (STOCK[stockKey(s,k)]||0)>0; }
-var S={ fit:{CORE:0,INJECTOR:0,COOLANT:0,EXCHANGER:0,GOVERNOR:0},
-        op:0.5, tests:5, best:null, found:{}, testing:null, pick:null, pickSel:0 };
+var BINS=48;
+/* each weapon's formula is a fixed target spectrum: peaks it wants hit.
+   deterministic per weapon — the puzzle is legible and learnable. */
+function gauss(x,mu,sg){ var z=(x-mu)/sg; return Math.exp(-z*z/2); }
+var WEAPONS=[
+  {id:"TOMAHAWK", name:"TOMAHAWK", desc:"cruise airframe",
+   tgt:function(b){ var x=b/BINS;
+     return gauss(x,0.22,0.06)*0.9 + gauss(x,0.62,0.09)*0.7; }},
+  {id:"ORBITAL",  name:"ORBITAL LANCE", desc:"beam coherence",
+   tgt:function(b){ var x=b/BINS;
+     return gauss(x,0.15,0.04)*0.8 + gauss(x,0.5,0.05)*1.0 + gauss(x,0.85,0.06)*0.6; }},
+  {id:"MECHA",    name:"MECHA DROP", desc:"chassis resonance",
+   tgt:function(b){ var x=b/BINS;
+     return gauss(x,0.35,0.16)*0.85 + gauss(x,0.78,0.05)*0.5; }},
+];
 
-/* ============ the physics: coupled, legible, with one hidden resonance ============ */
-function parts(){ var p={}; ORDER.forEach(function(s){ p[s]=LIB[s][S.fit[s]]; }); return p; }
-function resonant(p){ return p.INJECTOR.n==="PULSE FEED" && p.COOLANT.n==="CRYO LOOP"; }
-function metrics(load){
-  var p=parts(), res=resonant(p);
-  var rawHeat = Math.pow(load,1.7)*11*p.CORE.heat*p.INJECTOR.heat*(res?0.82:1);
-  var cooled  = Math.max(0, rawHeat/p.COOLANT.cool - p.EXCHANGER.relief);
-  var margin  = 10-cooled;                                   // <0 = scram territory
-  var drag    = p.COOLANT.drag+p.EXCHANGER.drag;
-  var output  = p.CORE.pow*p.INJECTOR.boost*load*(1-drag)*p.GOVERNOR.eff;
-  var stab    = (p.CORE.stab+p.INJECTOR.stab+p.GOVERNOR.damp+(res?0.25:0)) - load*0.85
-              - (margin<2 ? 0.3 : 0);
-  return { out:output, margin:margin, stab:stab };
+/* shared profile — same key the theatre uses */
+var P=(function(){
+  try{ var p=JSON.parse(localStorage.getItem("warclock_profile"));
+       if (p && p.v===1) return p; }catch(e){}
+  return {v:1, sorties:0, wins:0, verdicts:[], crew:null};
+})();
+if (!P.arsenal) P.arsenal={};
+function saveP(){ try{ localStorage.setItem("warclock_profile",JSON.stringify(P)); }catch(e){} }
+
+/* mixer state: 4 oscillator channels. FREQ/WIDTH/GAIN each stepped, not slid —
+   discrete moves keep it instrument-like and tunable by feel. */
+var cur=0, armT=0;
+var CH;
+function chDefault(){
+  return [ {f:0.25,w:0.08,g:0.5}, {f:0.5,w:0.08,g:0.5},
+           {f:0.75,w:0.08,g:0.0}, {f:0.4,w:0.16,g:0.0} ];
+}
+function loadCh(){
+  var a=P.arsenal[WEAPONS[cur].id];
+  CH=(a&&a.ch)?a.ch.map(function(c){return {f:c.f,w:c.w,g:c.g};}):chDefault();
+}
+function mixAt(x){
+  var v=0;
+  for (var k=0;k<CH.length;k++) v+=gauss(x,CH[k].f,Math.max(0.02,CH[k].w))*CH[k].g;
+  return v;
+}
+function fit(){
+  var err=0,tot=0;
+  for (var b=0;b<BINS;b++){ var x=b/BINS, t=WEAPONS[cur].tgt(b), m=mixAt(x);
+    err+=Math.abs(m-t); tot+=t; }
+  return Math.max(0,1-err/tot);
 }
 
-/* ============ gauges: distributions across the envelope, not fill bars ============ */
-var LOADS=[0.1,0.3,0.5,0.7,0.9];
-function cellClass(row,m){
-  if (row===0) return m.out>=7?"g":m.out>=3.2?"n":"r";
-  if (row===1) return m.margin>=4?"g":m.margin>=1.5?"n":"r";
-  return m.stab>=0.45?"g":m.stab>=0.2?"n":"r";
+/* ============ render ============ */
+var spec=document.getElementById("spec"), sctx=spec.getContext("2d");
+function fitCanvas(c){ var r=c.getBoundingClientRect(), d=window.devicePixelRatio||1;
+  if (!r.width) return;
+  var w=Math.round(r.width*d), h=Math.round(r.height*d);
+  if (c.width!==w||c.height!==h){ c.width=w; c.height=h; } }
+function drawSpec(){
+  fitCanvas(spec);
+  var W=spec.width,H=spec.height,d=window.devicePixelRatio||1;
+  sctx.clearRect(0,0,W,H);
+  var pad=8*d, bw=(W-pad*2)/BINS, base=H-14*d, top=10*d, span=base-top;
+  var TOL=0.12;
+  for (var b=0;b<BINS;b++){
+    var x=b/BINS, t=WEAPONS[cur].tgt(b), m=mixAt(x);
+    var bx=pad+b*bw;
+    // current mix: the spectral bar. within tolerance = green, hot = red, cold = dim
+    var col = Math.abs(m-t)<=TOL ? "#d8ff3d" : m>t ? "#ff5a2a" : "#4a4a54";
+    var mh=Math.min(1.15,m)*span;
+    sctx.fillStyle=col;
+    sctx.fillRect(bx,base-mh,Math.max(1,bw*0.7),mh);
+    // target curve: ticks riding above the bars
+    var th=Math.min(1.15,t)*span;
+    sctx.fillStyle="rgba(232,228,216,.85)";
+    sctx.fillRect(bx,base-th-1.5*d,Math.max(1,bw*0.7),1.5*d);
+  }
+  sctx.strokeStyle="#34343c";
+  sctx.beginPath(); sctx.moveTo(pad,base); sctx.lineTo(W-pad,base); sctx.stroke();
+  // channel markers along the base
+  CH.forEach(function(c,k){
+    if (c.g<=0) return;
+    var cx=pad+c.f*(W-pad*2);
+    sctx.fillStyle="#ffb63d"; sctx.font=(8*d)+"px monospace"; sctx.textAlign="center";
+    sctx.fillText(String.fromCharCode(65+k),cx,base+10*d);
+  });
 }
-/* each gauge is its own 5(load)x3(thickness) block — the 3 rows repeat the
-   same read so the block reads as a chunky bar, not a thin strip */
-function ensureCells(){
-  for (var g=0; g<3; g++){
-    var box=document.getElementById("g"+g);
-    if (box.children.length) continue;
-    for (var r=0;r<3;r++) for (var k=0;k<5;k++){
-      var el=document.createElement("div");
-      el.className="cell"; el.id="g"+g+"c"+r+k;
-      box.appendChild(el);
+function renderWeapons(){
+  WEAPONS.forEach(function(w,k){
+    var el=document.getElementById("w"+k);
+    var a=P.arsenal[w.id];
+    var mk=a?("MK "+(1+Math.round(a.fit*3))+" · "+Math.round(a.fit*100)+"%"):"uncalibrated";
+    el.className="wpn"+(k===cur?" on":"");
+    el.innerHTML='<span class="k">'+w.name+'</span><span class="mk">'+mk+'</span>';
+  });
+  document.getElementById("proflink").textContent=
+    P.sorties?("profile: "+P.sorties+" sorties"):"profile: fresh";
+}
+function renderMixer(){
+  document.getElementById("mixer").innerHTML=CH.map(function(c,k){
+    function param(pk,val,dk){
+      return '<div class="param"><span class="pk">'+pk+'</span><div class="row">'
+        +'<button data-ch="'+k+'" data-p="'+dk+'" data-d="-1">−</button>'
+        +'<span class="pv">'+val+'</span>'
+        +'<button data-ch="'+k+'" data-p="'+dk+'" data-d="1">+</button></div></div>';
     }
-  }
-}
-function renderGauges(fault){
-  ensureCells();
-  var opIdx=Math.round((S.op-0.1)/0.2);
-  for (var g=0; g<3; g++) for (var r=0;r<3;r++) for (var k=0;k<5;k++){
-    var el=document.getElementById("g"+g+"c"+r+k), m=metrics(LOADS[k]);
-    el.className="cell "+cellClass(g,m)
-      +(k===opIdx?" op":"")
-      +((fault && fault.row===g && k===opIdx)?" blink":"");
-  }
-}
-
-/* ============ schematic ============ */
-var sc=document.getElementById("schem"), sctx=sc.getContext("2d");
-var NODES;  // station boxes, laid out as a loop
-function fit(){ var r=sc.getBoundingClientRect(),d=window.devicePixelRatio||1;
-  sc.width=r.width*d; sc.height=r.height*d;
-  var W=sc.width,H=sc.height,bw=W*0.26,bh=H*0.2;
-  // stations dock on the edges, wired to the ring
-  NODES={
-    CORE:      {x:6,        y:H*0.06,  w:bw,h:bh},
-    INJECTOR:  {x:6,        y:H*0.42,  w:bw,h:bh},
-    GOVERNOR:  {x:6,        y:H*0.78,  w:bw,h:bh},
-    COOLANT:   {x:W-bw-6,   y:H*0.06,  w:bw,h:bh},
-    EXCHANGER: {x:W-bw-6,   y:H*0.78,  w:bw,h:bh},
-  };
-}
-function heatColor(margin){          // green -> amber -> red as margin thins
-  return margin>=4?"216,255,61":margin>=1.5?"255,182,61":"255,90,42";
-}
-var phase=0, coreP=0, scramFlash=0;
-function renderReactor(dt){
-  var W=sc.width,H=sc.height,d=window.devicePixelRatio||1;
-  var cx=W*0.5, cy=H*0.5, R=Math.min(W,H)*0.30;
-  // effective load: live ramp during a test, else the dial
-  var T=S.testing;
-  var load = T ? S.op*Math.min(1,T.t/(T.dur*0.55)) : S.op;
-  var m=metrics(load);
-  var outN=Math.max(0,Math.min(1,m.out/14));
-  var jit =Math.max(0,Math.min(1,0.55-m.stab));
-  var dead = T&&T.fault;
-  phase += dt*(dead?0.15:(0.4+load*2.6));                 // spool speed = load
-  coreP += dt*(2+load*7);
-  if (dead) scramFlash=Math.min(1,scramFlash+dt*4); else scramFlash=Math.max(0,scramFlash-dt*2);
-
-  sctx.fillStyle="#1e1e24"; sctx.fillRect(0,0,W,H);
-
-  // station tethers
-  ORDER.forEach(function(s){
-    var n=NODES[s];
-    sctx.strokeStyle="#34343c"; sctx.lineWidth=1.5;
-    sctx.beginPath(); sctx.moveTo(n.x+n.w/2,n.y+n.h/2); sctx.lineTo(cx,cy); sctx.stroke();
-  });
-
-  // outer condition dial: 3/4 sweep of the load range, colored by viability
-  var A0=Math.PI*0.75, SW=Math.PI*1.5, R2=R*1.38;
-  for (var t=0;t<40;t++){
-    var L=0.1+ (t/39)*0.8, mm=metrics(L);
-    var ok = mm.margin>=1.5 && mm.stab>=0.2;
-    var good = mm.margin>=4 && mm.stab>=0.45 && mm.out>=7;
-    sctx.strokeStyle = good?"rgba(216,255,61,.9)": ok?"rgba(61,90,128,.9)":"rgba(255,90,42,.75)";
-    sctx.lineWidth=4*d;
-    var a=A0+SW*(t/40), a2=A0+SW*((t+0.8)/40);
-    sctx.beginPath(); sctx.arc(cx,cy,R2,a,a2); sctx.stroke();
-  }
-  // needle at current load
-  var na=A0+SW*((load-0.1)/0.8);
-  sctx.strokeStyle="#e8e4d8"; sctx.lineWidth=2*d;
-  sctx.beginPath();
-  sctx.moveTo(cx+Math.cos(na)*(R2-7*d), cy+Math.sin(na)*(R2-7*d));
-  sctx.lineTo(cx+Math.cos(na)*(R2+7*d), cy+Math.sin(na)*(R2+7*d));
-  sctx.stroke();
-
-  // the torus: 24 segments, 3 rotating activation lobes
-  var SEGS=24, hc=heatColor(m.margin);
-  for (var i=0;i<SEGS;i++){
-    var th=i/SEGS*Math.PI*2;
-    var lobe=Math.pow(Math.max(0,Math.cos(3*(th-phase))),2);     // 3 hot lobes chase
-    var b=dead?0.06:(0.10+lobe*0.9*(0.25+outN*0.75));
-    var jr=(Math.random()-0.5)*jit*8*d;
-    var x=cx+Math.cos(th)*(R+jr), y=cy+Math.sin(th)*(R+jr);
-    var sz=(5+lobe*5)*d*(0.7+outN*0.5);
-    sctx.fillStyle="rgba("+hc+","+b.toFixed(3)+")";
-    sctx.fillRect(x-sz/2,y-sz/2,sz,sz);
-  }
-  // containment ring
-  sctx.strokeStyle="rgba(232,228,216,"+(dead?0.08:0.18)+")"; sctx.lineWidth=1.5;
-  sctx.beginPath(); sctx.arc(cx,cy,R,0,Math.PI*2); sctx.stroke();
-
-  // core glow: pulses with output, shudders when unstable
-  var pj=(Math.random()-0.5)*jit*6*d;
-  var pr=R*0.34*(0.85+0.15*Math.sin(coreP))*(dead?0.55:1);
-  var g=sctx.createRadialGradient(cx+pj,cy+pj,1,cx+pj,cy+pj,pr);
-  g.addColorStop(0,"rgba("+hc+","+(dead?0.25:0.55+outN*0.4)+")");
-  g.addColorStop(1,"rgba("+hc+",0)");
-  sctx.fillStyle=g;
-  sctx.beginPath(); sctx.arc(cx+pj,cy+pj,pr,0,Math.PI*2); sctx.fill();
-
-  // scram: white-red flash wash
-  if (scramFlash>0){
-    sctx.fillStyle="rgba(255,90,42,"+(scramFlash*0.22)+")";
-    sctx.fillRect(0,0,W,H);
-  }
-
-  // station tabs on top
-  ORDER.forEach(function(s){
-    var n=NODES[s], hot=S.pick===s;
-    sctx.fillStyle="#17171b"; sctx.fillRect(n.x,n.y,n.w,n.h);
-    sctx.strokeStyle=hot?"#d8ff3d":"#3a3a42"; sctx.lineWidth=hot?3:1.5;
-    sctx.strokeRect(n.x,n.y,n.w,n.h);
-    sctx.fillStyle="#6f6c62"; sctx.font=(9*d)+"px monospace"; sctx.textAlign="left";
-    sctx.fillText(s, n.x+5*d, n.y+11*d);
-    sctx.fillStyle="#e8e4d8"; sctx.font=(10*d)+"px monospace";
-    sctx.fillText(LIB[s][S.fit[s]].n, n.x+5*d, n.y+n.h-7*d);
-  });
-
-  // live test trace along the bottom
-  if (T){
-    sctx.strokeStyle=T.fault?"#ff5a2a":"#d8ff3d"; sctx.lineWidth=2;
-    sctx.beginPath();
-    T.trace.forEach(function(v,i){
-      var x=W*0.06+(W*0.88)*(i/(T.dur*30));
-      var y=H*0.96 - v*H*0.16;
-      i?sctx.lineTo(x,y):sctx.moveTo(x,y);
-    });
-    sctx.stroke();
-  }
-}
-
-/* ============ deck ============ */
-function renderDeck(){
-  var m=metrics(S.op);
-  var st=[["OUTPUT",m.out.toFixed(1),m.out<3.2],["MARGIN",m.margin.toFixed(1),m.margin<1.5],
-          ["STAB",m.stab.toFixed(2),m.stab<0.2],["TESTS",S.tests,S.tests===0],
-          ["RATING",S.best?S.best:"—",false]];
-  document.getElementById("stats").innerHTML=st.map(function(s){
-    return '<div class="stat'+(s[2]?" low":"")+'"><div class="k">'+s[0]+'</div><div class="v">'+s[1]+'</div></div>';
-  }).join("");
-  var bs=document.getElementById("btnspin");
-  bs.textContent = S.testing ? "■ SCRAM" : "▸ SPIN UP";
-  bs.disabled = !S.testing && S.tests<=0;
-}
-function msg(html){ document.getElementById("msg").innerHTML=html; }
-
-/* picker flow: tap station -> options + RETURN/ENTER */
-var deck=document.getElementById("deck");
-function openPick(s){
-  S.pick=s; S.pickSel=S.fit[s];
-  deck.classList.add("picking");
-  document.getElementById("picker").classList.add("on");
-  document.getElementById("btnreturn").style.display="";
-  document.getElementById("btnenter").style.display="";
-  document.getElementById("btnspin").style.display="none";
-  renderPick();
-}
-function renderPick(){
-  document.getElementById("picker").innerHTML=LIB[S.pick].map(function(c,k){
-    var have=STOCK[stockKey(S.pick,k)]||0, own=have>0;
-    return '<button class="pick'+(k===S.pickSel?" sel":"")+(own?"":" locked")+'" data-k="'+k+'"'+(own?"":" disabled")+'>'
-      +'<span>'+c.n+'</span><span class="d">'+c.d+' · '+(own?"×"+have:"—")+'</span></button>';
+    return '<div class="ch'+(c.g<=0?" mute":"")+'"><span class="nm">OSC '+String.fromCharCode(65+k)+'</span>'
+      +param("FREQ",Math.round(c.f*100),"f")
+      +param("WIDTH",Math.round(c.w*100),"w")
+      +param("GAIN",Math.round(c.g*100),"g")
+      +'</div>';
   }).join("");
 }
-function closePick(commit){
-  if (commit && S.pick){ S.fit[S.pick]=S.pickSel; }
-  S.pick=null;
-  deck.classList.remove("picking");
-  document.getElementById("picker").classList.remove("on");
-  document.getElementById("btnreturn").style.display="none";
-  document.getElementById("btnenter").style.display="none";
-  document.getElementById("btnspin").style.display="";
-  renderAll();
-}
-document.getElementById("picker").addEventListener("click",function(e){
-  var b=e.target.closest(".pick"); if(!b||b.disabled)return;
-  S.pickSel=+b.dataset.k; renderPick();
-});
-document.getElementById("btnreturn").addEventListener("click",function(){ closePick(false); });
-document.getElementById("btnenter").addEventListener("click",function(){ closePick(true); });
-/* debug: acquire a random locked/scarce part (stands in for salvage/blueprints) */
-document.getElementById("btnacq").addEventListener("click",function(){
-  var pool=[];
-  ORDER.forEach(function(s){ LIB[s].forEach(function(c,k){
-    if ((STOCK[stockKey(s,k)]||0)===0) pool.push([s,k]);
-  }); });
-  if (!pool.length){ msg("inventory full — every part owned."); return; }
-  var pick=pool[(Math.random()*pool.length)|0];
-  STOCK[stockKey(pick[0],pick[1])]=1;
-  msg("<b class='up'>ACQUIRED</b> "+LIB[pick[0]][pick[1]].n+" ("+pick[0]+") — new permutations unlocked.");
-  if (S.pick) renderPick();
-});
-sc.addEventListener("pointerdown",function(e){
-  if (S.testing) return;
-  var r=sc.getBoundingClientRect(),d=window.devicePixelRatio||1;
-  var x=(e.clientX-r.left)*d, y=(e.clientY-r.top)*d;
-  for (var i=0;i<ORDER.length;i++){
-    var n=NODES[ORDER[i]];
-    if (x>=n.x&&x<=n.x+n.w&&y>=n.y&&y<=n.y+n.h){ openPick(ORDER[i]); return; }
-  }
-});
-
-/* op dial */
-var opEl=document.getElementById("op");
-opEl.addEventListener("input",function(){
-  S.op=+opEl.value/100;
-  document.getElementById("opv").textContent=opEl.value+"%";
-  if (S.testing) S.testing.touched=true;     // hand-riding forfeits the clean-burn bonus
-  renderAll();
-});
-
-/* ============ orders: the bench has a customer ============ */
-var ORDER_TAGS=["LANCE 2 REFIT","CAS TENDER","SIEGE MECHA","RECON FRAME","GARRISON PLANT"];
-function newOrder(){
-  S.order={ tag:ORDER_TAGS[(Math.random()*ORDER_TAGS.length)|0],
-            out:+(5+Math.random()*4).toFixed(1),
-            margin:+(1+Math.random()*2).toFixed(1) };
-  renderDeck();
-}
-function orderLine(){
-  return "ORDER <b>"+S.order.tag+"</b> — needs OUT ≥ "+S.order.out+" · MARGIN ≥ "+S.order.margin
-    +"\nburn in and hold spec at final load. reward: parts + test articles.";
+function renderFit(){
+  var f=fit();
+  document.getElementById("fitv").textContent=Math.round(f*100)+"%";
+  document.getElementById("fitv").style.color = f>0.8?"#d8ff3d":f>0.5?"#ffb63d":"#e8e4d8";
+  var burn=document.getElementById("burn");
+  var a=P.arsenal[WEAPONS[cur].id];
+  burn.disabled = !!(a && f<=a.fit);              // only better calibrations burn
 }
 
-/* ============ burn-in: dial stays LIVE, transients are foreseeable ============ */
-document.getElementById("btnspin").addEventListener("click",function(){
-  if (S.testing){                                   // manual scram — save the hardware
-    S.testing.manual=true; S.testing.fault={row:1,at:"DIRECTOR",why:"manual scram"};
-    return;
-  }
-  if (S.tests<=0) return;
-  S.tests--;
-  // transients scheduled up front; a thin envelope makes them bite harder
-  S.testing={ t:0, dur:6, trace:[], fault:null, touched:false, pen:0,
-              events:[1.5+Math.random()*2, 3.5+Math.random()*1.8] };
-  msg("SPIN UP — ramping to "+((S.op*100)|0)+"% … dial is live.");
-  renderDeck();
+/* ============ input ============ */
+document.getElementById("mixer").addEventListener("click",function(e){
+  var b=e.target.closest("button"); if (!b) return;
+  var c=CH[+b.dataset.ch], p=b.dataset.p, dl=+b.dataset.d;
+  var step = p==="f"?0.02 : p==="w"?0.01 : 0.05;
+  c[p]=Math.max(0,Math.min(p==="f"?1:p==="w"?0.3:1.2, c[p]+dl*step));
+  renderMixer(); renderFit(); drawSpec();
 });
-function stepTest(dt){
-  var T=S.testing; T.t+=dt;
-  var ramp=Math.min(1,T.t/(T.dur*0.45));
-  var load=S.op*ramp;                               // S.op live — riding the dial works
-  var m=metrics(load);
-  // transient events: margin dips you can see coming from a thin THERMAL band
-  if (T.events.length && T.t>=T.events[0]){
-    T.events.shift();
-    T.pen = m.margin<3 ? 2.4 : 1.1;
-    msg("<b class='rq'>TRANSIENT</b> — coolant cavitation, margin dipping. ride the dial or trust it.");
-  }
-  if (T.pen>0) T.pen=Math.max(0,T.pen-dt*1.4);
-  var noise=(Math.random()-0.5)*0.6 + (Math.random()<0.04?(Math.random()-0.5)*2.2:0);
-  var mNow={ out:m.out, margin:m.margin-T.pen+noise, stab:m.stab+noise*0.25 };
-  T.trace.push(Math.max(0,Math.min(1,mNow.out/14+(Math.random()-0.5)*0.03)));
-  if (!T.fault && T.t>0.6){
-    if (mNow.margin<0) T.fault={row:1, at:"EXCHANGER", why:"thermal runaway"};
-    else if (mNow.stab<0.02) T.fault={row:2, at:"GOVERNOR", why:"oscillation divergence"};
-  }
-  if (T.fault && T.t<T.dur) T.dur=Math.min(T.dur,T.t+0.7);
-  if (T.t>=T.dur){
-    var p=parts();
-    if (T.fault && !T.manual){
-      burnout();
-      msg("<b class='bad'>SCRAM</b> @ "+T.fault.at+" — "+T.fault.why+".\nfailed at "
-        +((S.op*100)|0)+"% load. hardware burned.");
-      renderGauges(T.fault);
-    } else if (T.manual){
-      msg("manual scram — article spent, hardware safe. derate or refit, then retry.");
-    } else {
-      var mm=metrics(S.op);
-      var clean=!T.touched;
-      var rating=+(mm.out*(1+mm.stab)*(clean?1.1:1)).toFixed(1);
-      if (!S.best || rating>+S.best) S.best=rating;
-      var lines=["<b class='up'>BURN-IN PASSED</b> at "+((S.op*100)|0)+"%. rating <b>"+rating+"</b>"
-        +(clean?" <b class='up'>· CLEAN BURN ×1.1</b>":" (hand-ridden)")];
-      if (resonant(p) && !S.found.res){ S.found.res=true;
-        lines.push("<b class='rq'>◈ HARMONIC LOCK — pulse feed rings clean in the cryo loop. logged.</b>"); }
-      if (mm.out>=S.order.out && mm.margin>=S.order.margin){
-        S.tests+=2; grantPart();
-        lines.push("<b class='up'>◈ ORDER "+S.order.tag+" DELIVERED</b> — +2 articles, +1 part.");
-        newOrder(); lines.push(orderLine());
-      } else {
-        lines.push("spec not met ("+S.order.tag+" needs OUT ≥ "+S.order.out+" · MARGIN ≥ "+S.order.margin+").");
-      }
-      msg(lines.join("\n"));
-    }
-    S.testing=null; renderDeck();
-  }
-}
-/* a real fault costs hardware: one owned part burns */
-function burnout(){
-  var pool=[];
-  ORDER.forEach(function(s){ LIB[s].forEach(function(c,k){
-    if ((STOCK[stockKey(s,k)]||0)>0 && !(s==="CORE"&&k===0)) pool.push([s,k]);  // never burn the last salvage core path
-  }); });
-  if (!pool.length) return;
-  var b=pool[(Math.random()*pool.length)|0];
-  STOCK[stockKey(b[0],b[1])]--;
-  if (S.fit[b[0]]===b[1] && (STOCK[stockKey(b[0],b[1])]||0)===0) S.fit[b[0]]=0;
-  msg("<b class='bad'>burnout: "+LIB[b[0]][b[1]].n+" destroyed.</b>");
-}
-function grantPart(){
-  var pool=[];
-  ORDER.forEach(function(s){ LIB[s].forEach(function(c,k){ pool.push([s,k]); }); });
-  var g=pool[(Math.random()*pool.length)|0];
-  STOCK[stockKey(g[0],g[1])]=(STOCK[stockKey(g[0],g[1])]||0)+1;
-}
+WEAPONS.forEach(function(w,k){
+  document.getElementById("w"+k).addEventListener("click",function(){
+    cur=k; loadCh(); renderWeapons(); renderMixer(); renderFit(); drawSpec();
+  });
+});
+var burnEl=document.getElementById("burn");
+burnEl.addEventListener("click",function(){
+  if (burnEl.disabled) return;
+  if (armT<=0){ armT=2.5; burnEl.classList.add("armed"); burnEl.textContent="CONFIRM BURN-IN ▸"; return; }
+  armT=0; burnEl.classList.remove("armed"); burnEl.textContent="BURN-IN CALIBRATION";
+  var f=fit();
+  P.arsenal[WEAPONS[cur].id]={fit:Math.round(f*100)/100, ch:CH.map(function(c){return {f:c.f,w:c.w,g:c.g};})};
+  saveP(); renderWeapons(); renderFit();
+  document.getElementById("note").textContent=
+    WEAPONS[cur].name+" calibrated at "+Math.round(f*100)+"% — live in the next sortie";
+});
+setInterval(function(){ if (armT>0){ armT-=0.1;
+  if (armT<=0){ burnEl.classList.remove("armed"); burnEl.textContent="BURN-IN CALIBRATION"; } } },100);
 
-/* ============ loop: the reactor is always alive ============ */
-function renderAll(){ renderGauges(); renderDeck(); }
-var last=performance.now();
-function loop(now){
-  var dt=Math.min(0.1,(now-last)/1000); last=now;
-  if (S.testing){ stepTest(dt); renderDeck(); if(Math.random()<0.3)renderGauges(); }
-  renderReactor(dt);
-  requestAnimationFrame(loop);
-}
-window.addEventListener("resize",function(){ fit(); renderAll(); });
-initStock(); newOrder(); fit(); renderAll(); requestAnimationFrame(loop);
-msg(orderLine());
+loadCh(); renderWeapons(); renderMixer(); renderFit(); drawSpec();
+window.addEventListener("resize",drawSpec);
 </script>
 </body>
 </html>

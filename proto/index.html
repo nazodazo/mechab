@@ -251,6 +251,10 @@ var P=(function(){
   return {v:1, sorties:0, wins:0, verdicts:[], crew:null};
 })();
 function saveProfile(){ try{ localStorage.setItem("warclock_profile",JSON.stringify(P)); }catch(e){} }
+/* arsenal calibration from the bench: fit 0..1 scales weapon performance.
+   uncalibrated ordnance still works — the bench makes it BETTER, never gates it. */
+function arsFit(id){ return (P.arsenal&&P.arsenal[id])?P.arsenal[id].fit:0; }
+function arsMk(id){ return P.arsenal&&P.arsenal[id]?"MK "+(1+Math.round(P.arsenal[id].fit*3)):"MK 1"; }
 var MEDALS={ LONE:{ic:"◈",name:"sole survivor on completion"},
   IRON:{ic:"✚",name:"survived 2+ casualties"},
   DA:{ic:"▲",name:"sabotage completed"}, SR:{ic:"◆",name:"espionage completed"},
@@ -682,13 +686,13 @@ function fireLAOE(kind){
     tick("TOMAHAWK away — bird in the air","rq",true); mark("TMH",true);
     S.receipts.push("◈ TOMAHAWK strike (1 MAT)");
     S.mon={kind:"KIN",label:"TOMAHAWK",t:0,dur:4, at:4*0.85, fx:function(){
-      strike(tgt.x,tgt.y,10,0.7);
+      strike(tgt.x,tgt.y,10*(0.85+arsFit("TOMAHAWK")*0.3),0.7*(0.8+arsFit("TOMAHAWK")*0.4));
       tick("TOMAHAWK impact — terrain cratered","up",true); }};
   } else {
     tick("ORBITAL LANCE firing — stand by","rq",true); mark("ORB",true);
     S.receipts.push("◈ ORBITAL strike (3 MAT)");
     S.mon={kind:"KIN",label:"ORBITAL LANCE",t:0,dur:4.5, at:4.5*0.85, fx:function(){
-      strike(tgt.x,tgt.y,16,0.9);
+      strike(tgt.x,tgt.y,16*(0.85+arsFit("ORBITAL")*0.3),0.9*(0.8+arsFit("ORBITAL")*0.4));
       tick("ORBITAL LANCE — the map remembers this","up",true); }};
   }
   return true;
@@ -1251,14 +1255,15 @@ function renderTickers(){
   tkSet(1,[["141 "+(q.urge?"URGED":"steady"),q.urge?"up":"ink"],[(q.phase==="WORK"?q.op.name:q.phase),"dim"]],
           q.urge?"up":false, crew+"/4");
 
-  var ck = S.mat>=3?[["ORBITAL LANCE keyed","up"],["vast area","dim"]]
-         : S.mat>=1?[["TOMAHAWK keyed","up"],["large area","dim"]]
+  var ck = S.mat>=3?[["ORBITAL LANCE keyed","up"],[arsMk("ORBITAL")+" calibration","dim"]]
+         : S.mat>=1?[["TOMAHAWK keyed","up"],[arsMk("TOMAHAWK")+" calibration","dim"]]
          : [["no strike keys","dim"],["earn MAT via espionage/uplink ops","dim"]];
   tkSet(2,ck, S.mat>=1?"up":false, S.mat+" MAT");
 
   var mk = S.mechaUnit?[["MECHA fielded","up"],["holding ground taken","dim"]]
          : S.mechaCd>0?[["mecha cooling","dim"]]
-         : S.req>=250?[["MECHA DROP ready","up"]]:[["mecha ready — need 250 req","dim"]];
+         : S.req>=250?[["MECHA DROP ready","up"],[arsMk("MECHA")+" chassis","dim"]]
+         : [["mecha ready — need 250 req","dim"]];
   var badge4 = S.mechaCd>0?(S.mechaCd|0)+"s":(S.req|0)+"";
   tkSet(3,mk, (!S.mechaUnit&&S.mechaCd<=0&&S.req>=250)?"up":false, badge4);
 }
@@ -1329,7 +1334,7 @@ var BTN=[
   { slot:"D", label:function(){ return S.mechaUnit?"FIELDED":"MECHA"; },
     cost:function(){ return S.mechaCd>0?"cool "+(S.mechaCd|0)+"s":"−250 req"; },
     can:function(){ return !S.mechaUnit && S.mechaCd<=0 && S.req>=250; },
-    fire:function(){ if (fireLAOE("MECHA")){ S.req-=250; S.mechaCd=45; } } },
+    fire:function(){ if (fireLAOE("MECHA")){ S.req-=250; S.mechaCd=45*(1-arsFit("MECHA")*0.35); } } },
   { slot:"", label:function(){ return "RECALL"; }, cost:function(){ return ""; },
     can:function(){ return me().phase==="INSERT"||me().phase==="WORK"; },
     fire:function(){ me().phase="EXFIL"; S.cue=null; tick("you: abort. 141 exfiltrating","team"); } },
