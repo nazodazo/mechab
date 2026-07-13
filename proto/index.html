@@ -53,7 +53,10 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 #feed div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--dim)}
 #feed .up{color:var(--us)} #feed .bad{color:var(--foe)} #feed .rq{color:var(--amber)} #feed .team{color:var(--ink)}
 
-#deck{flex:1;margin-top:5px;padding:14px 8px 8px;display:flex;flex-direction:column;gap:6px;overflow:hidden}
+#deck{flex:1;min-height:0;margin-top:5px;padding:6px 8px 8px;display:flex;flex-direction:column;gap:6px;overflow:hidden}
+/* deck header is its own in-flow segment — never overlapped by the cue banner */
+#deck>.ph{position:static;transform:none;flex:none;display:block;background:transparent;
+  padding:0 0 3px;border-bottom:1px solid var(--line)}
 #reqbar{border:1px solid var(--amber);padding:4px 8px;display:none;flex:none}
 #reqbar.on{display:block}
 #reqbar .t{color:var(--amber);font-size:11px}
@@ -90,7 +93,7 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 
 /* actions: stacked vertically, press-arm-confirm */
 #actions{display:flex;flex-direction:column;gap:5px;flex:none}
-#actions button{padding:9px 12px;font-family:var(--mono);font-size:12px;letter-spacing:.05em;
+#actions button{padding:7px 12px;font-family:var(--mono);font-size:12px;letter-spacing:.05em;
   background:var(--bg);border:1px solid var(--line);color:var(--ink);text-align:left;
   display:flex;justify-content:space-between;
   touch-action:manipulation;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
