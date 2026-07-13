@@ -441,7 +441,7 @@ var REQ_POOLS={
         function(sq){S.req-=80;sq.prog+=30;tick("141: charges set — ahead of schedule","up");},
         function(sq){tick("141: copy — slow way then","team");}],
       ["CAS DANGER-CLOSE","−1 cas",function(){return S.cas>0;},
-        function(sq){S.cas--;blast(sq.x,sq.y,8,0.5);sq.heat=0;S.mon={kind:"CAS",label:"CAS RUN",t:0,dur:3.5};tick("CAS in — danger close","up",true);},
+        function(sq){S.cas--;sq.heat=0;tick("CAS inbound — keep heads down","rq",true);S.mon={kind:"CAS",label:"CAS RUN",t:0,dur:3.5, at:3.5*0.7, fx:function(){blast(sq.x,sq.y,8,0.5);tick("CAS in — danger close","up",true);}};},
         function(sq){sq.prog=Math.max(0,sq.prog-15);tick("141: no air — breaking contact","team");}]],
   SR:[["APPROVE BRIBE","−100 req",function(){return S.req>=100;},
         function(sq){S.req-=100;sq.prog+=35;tick("141: asset paid — doors open","up");},
@@ -459,7 +459,7 @@ var REQ_POOLS={
         function(sq){S.req-=120;blast(sq.x,sq.y,6,0.35);tick("141: locals armed — line surging","up");},
         function(sq){tick("141: holding with what we have","team");}],
       ["CAS DANGER-CLOSE","−1 cas",function(){return S.cas>0;},
-        function(sq){S.cas--;blast(sq.x,sq.y,8,0.5);sq.heat=0;S.mon={kind:"CAS",label:"CAS RUN",t:0,dur:3.5};tick("CAS in — danger close","up",true);},
+        function(sq){S.cas--;sq.heat=0;tick("CAS inbound — keep heads down","rq",true);S.mon={kind:"CAS",label:"CAS RUN",t:0,dur:3.5, at:3.5*0.7, fx:function(){blast(sq.x,sq.y,8,0.5);tick("CAS in — danger close","up",true);}};},
         function(sq){sq.prog=Math.max(0,sq.prog-15);}]],
 };
 function raiseRequest(sq){
@@ -488,20 +488,23 @@ function fireLAOE(kind){
     if (hs) tgt={x:hs.x*BW+BW/2,y:hs.y*BW+BW/2}; }
   if (!tgt){ tick("no target mass for strike","team"); return false; }
   if (kind==="MECHA"){
-    S.mechaUnit={x:tgt.x,y:tgt.y,t:0};
-    S.mon={kind:"MECHA",label:"MECHA DROP",t:0,dur:4};
-    tick("MECHA DROP — clearing the grid square","up",true); mark("MEC",true);
+    tick("MECHA DROP — chassis away","rq",true); mark("MEC",true);
     S.receipts.push("◈ MECHA deployed @ front — area cleared and held");
+    S.mon={kind:"MECHA",label:"MECHA DROP",t:0,dur:4, at:4*0.9, fx:function(){
+      S.mechaUnit={x:tgt.x,y:tgt.y,t:0};        // touches down when the monitor says GROUND
+      tick("MECHA down — clearing the grid square","up",true); }};
   } else if (kind==="TOMAHAWK"){
-    strike(tgt.x,tgt.y,10,0.7);
-    tick("TOMAHAWK impact — terrain cratered","up",true); mark("TMH",true);
+    tick("TOMAHAWK away — bird in the air","rq",true); mark("TMH",true);
     S.receipts.push("◈ TOMAHAWK strike (1 MAT)");
-    S.mon={kind:"KIN",label:"TOMAHAWK",t:0,dur:4};
+    S.mon={kind:"KIN",label:"TOMAHAWK",t:0,dur:4, at:4*0.85, fx:function(){
+      strike(tgt.x,tgt.y,10,0.7);
+      tick("TOMAHAWK impact — terrain cratered","up",true); }};
   } else {
-    strike(tgt.x,tgt.y,16,0.9);
-    tick("ORBITAL LANCE — the map remembers this","up",true); mark("ORB",true);
+    tick("ORBITAL LANCE firing — stand by","rq",true); mark("ORB",true);
     S.receipts.push("◈ ORBITAL strike (3 MAT)");
-    S.mon={kind:"KIN",label:"ORBITAL LANCE",t:0,dur:4.5};
+    S.mon={kind:"KIN",label:"ORBITAL LANCE",t:0,dur:4.5, at:4.5*0.85, fx:function(){
+      strike(tgt.x,tgt.y,16,0.9);
+      tick("ORBITAL LANCE — the map remembers this","up",true); }};
   }
   return true;
 }
@@ -516,7 +519,9 @@ function advance(dt){
   S.squads.forEach(function(sq){ squadTick(sq,dt); });
   mechaTick(dt);
   if (S.cue){ S.cue.left-=dt; if (S.cue.left<=0){ S.cue.no(S.cue.sq); S.cue=null; } }
-  if (S.mon){ S.mon.t+=dt; if (S.mon.t>=S.mon.dur) S.mon=null; }
+  if (S.mon){ S.mon.t+=dt;
+    if (S.mon.fx && !S.mon.fired && S.mon.t>=S.mon.at){ S.mon.fired=true; S.mon.fx(); }
+    if (S.mon.t>=S.mon.dur) S.mon=null; }
   S.req+=dt*2;
   S.tide=tideCalc(); S.hist.push(S.tide);
   if (S.t<=0 || Math.abs(S.tide)>0.55) end();
