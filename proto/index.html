@@ -675,9 +675,24 @@ function renderMap(){
     if (sq.phase==="DOWN"||sq.phase==="STAGING") return;
     var col = sq.player?"232,228,216": sq.side>0?"216,255,61":"255,90,42";
     var blink = sq.phase==="WORK" ? (Math.sin(now*7+sq.x)>0?1:0.4) : 0.95;
-    mctx.fillStyle="rgba("+col+","+blink+")";
-    var s3=sq.player?3.2:2.4;
-    mctx.fillRect(sq.x*sx-s3,sq.y*sy-s3,s3*2,s3*2);
+    if (sq.player){
+      // 141 reads at a glance: bigger diamond, standing ring, name tag —
+      // distinct from the anonymous troop motes and allied squares
+      var px2=sq.x*sx, py2=sq.y*sy, s4=6*d;
+      mctx.strokeStyle="rgba(255,182,61,.8)"; mctx.lineWidth=Math.max(1,d);
+      mctx.beginPath(); mctx.arc(px2,py2,s4+2*d,0,Math.PI*2); mctx.stroke();
+      mctx.fillStyle="rgba(232,228,216,"+blink+")";
+      mctx.beginPath();
+      mctx.moveTo(px2,py2-s4); mctx.lineTo(px2+s4,py2); mctx.lineTo(px2,py2+s4); mctx.lineTo(px2-s4,py2);
+      mctx.closePath(); mctx.fill();
+      mctx.font=(7*d)+"px monospace"; mctx.fillStyle="rgba(232,228,216,.9)";
+      mctx.textAlign="center"; mctx.textBaseline="bottom";
+      mctx.fillText("141",px2,py2-s4-4*d);
+    } else {
+      mctx.fillStyle="rgba("+col+","+blink+")";
+      var s3=2.4;
+      mctx.fillRect(sq.x*sx-s3,sq.y*sy-s3,s3*2,s3*2);
+    }
     if (sq.player){
       if (sq.obj){ mctx.strokeStyle="rgba(232,228,216,.35)"; mctx.lineWidth=1;
         mctx.beginPath(); mctx.moveTo(sq.x*sx,sq.y*sy);
