@@ -632,29 +632,42 @@ var TAPE_COL={ up:"#d8ff3d", bad:"#ff5a2a", rq:"#ffb63d", team:"#e8e4d8",
                ink:"#e8e4d8", dim:"#8a8778", sep:"#4a4a54" };
 function mkTape(canvas,fontPx,speed){
   return { c:canvas, ctx:canvas.getContext("2d"), fontPx:fontPx, speed:speed,
-           runs:[], w:0, off:0, dirty:true };
+           runs:[], widths:[], w:0, off:0, dirty:true, pending:null };
 }
-function tapeSet(tp,runs){ tp.runs=runs; tp.dirty=true; }
+/* content swaps wait for the seam: the new text enters where the old cycle
+   ends, never replacing what is currently on screen mid-read */
+function tapeSet(tp,runs){
+  if (!tp.runs.length){ tp.runs=runs; tp.dirty=true; }
+  else tp.pending=runs;
+}
+function tapeMeasure(tp,ctx){
+  tp.widths.length=0; var w=0;
+  for (var k=0;k<tp.runs.length;k++){
+    var rw=ctx.measureText(tp.runs[k].t).width; tp.widths.push(rw); w+=rw;
+  }
+  tp.w=Math.max(1,w); tp.dirty=false;
+}
 function tapeDraw(tp,dt){
   var c=tp.c, r=c.getBoundingClientRect();
   if (!r.width) return;
   var d=window.devicePixelRatio||1, cw=Math.round(r.width*d), ch=Math.round(r.height*d);
   if (c.width!==cw||c.height!==ch){ c.width=cw; c.height=ch; tp.dirty=true; }
-  var ctx=tp.ctx, font=(tp.fontPx*d)+"px "+'"SF Mono",ui-monospace,Consolas,monospace';
-  ctx.font=font; ctx.textBaseline="middle";
-  if (tp.dirty){                                   // re-measure one cycle's width
-    var w=0;
-    for (var k=0;k<tp.runs.length;k++) w+=ctx.measureText(tp.runs[k].t).width;
-    tp.w=Math.max(1,w); tp.dirty=false;
-    if (tp.off>=tp.w) tp.off%=tp.w;
+  var ctx=tp.ctx;
+  ctx.font=(tp.fontPx*d)+"px "+'"SF Mono",ui-monospace,Consolas,monospace';
+  ctx.textBaseline="middle";
+  if (tp.dirty) tapeMeasure(tp,ctx);
+  tp.off+=tp.speed*d*dt;
+  if (tp.off>=tp.w){                               // seam: safe point to take new content
+    tp.off-=tp.w;
+    if (tp.pending){ tp.runs=tp.pending; tp.pending=null; tapeMeasure(tp,ctx);
+      if (tp.off>=tp.w) tp.off%=tp.w; }
   }
-  tp.off+=tp.speed*d*dt; if (tp.off>=tp.w) tp.off-=tp.w;
   ctx.clearRect(0,0,cw,ch);
-  var y=ch/2, x=-tp.off;
-  while (x<cw){                                    // repeat the cycle across the window
+  var y=ch/2, x=-tp.off, guard=0;
+  while (x<cw && guard++<40){                      // repeat the cycle across the window
     for (var k2=0;k2<tp.runs.length;k2++){
-      var run=tp.runs[k2], rw=ctx.measureText(run.t).width;
-      if (x+rw>0 && x<cw){ ctx.fillStyle=run.col; ctx.fillText(run.t,x,y); }
+      var rw=tp.widths[k2];
+      if (x+rw>0 && x<cw){ ctx.fillStyle=tp.runs[k2].col; ctx.fillText(tp.runs[k2].t,x,y); }
       x+=rw;
     }
   }
