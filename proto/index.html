@@ -60,7 +60,8 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 .tk{flex:1;border:1px solid var(--line);background:var(--panel);
   display:flex;align-items:stretch;gap:0;min-height:0;position:relative;overflow:hidden}
 .tk .slot{color:var(--dim);border-right:1px solid var(--line);padding:0 6px;flex:none;
-  font-size:9px;display:flex;align-items:center}
+  font-size:9px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-width:22px}
+.tk .badge{font-size:9px;color:var(--ink);font-variant-numeric:tabular-nums}
 .tk .tape{flex:1;position:relative;overflow:hidden;min-width:0}
 .tk .tkin{position:absolute;left:0;top:0;height:100%;display:flex;align-items:center;
   white-space:nowrap;font-size:10px;color:var(--dim);padding:0 8px;
@@ -126,10 +127,10 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
   <div id="ticker"><div id="tickin"></div></div>
   <div id="midrow">
     <div id="tickers">
-      <div class="tk" id="tkA"><span class="slot">A</span><div class="tape"></div></div>
-      <div class="tk" id="tkB"><span class="slot">B</span><div class="tape"></div></div>
-      <div class="tk" id="tkC"><span class="slot">C</span><div class="tape"></div></div>
-      <div class="tk" id="tkD"><span class="slot">D</span><div class="tape"></div></div>
+      <div class="tk" id="tkA"><span class="slot">A<span class="badge"></span></span><div class="tape"></div></div>
+      <div class="tk" id="tkB"><span class="slot">B<span class="badge"></span></span><div class="tape"></div></div>
+      <div class="tk" id="tkC"><span class="slot">C<span class="badge"></span></span><div class="tape"></div></div>
+      <div class="tk" id="tkD"><span class="slot">D<span class="badge"></span></span><div class="tape"></div></div>
     </div>
     <div id="monwrap" class="panel"><span class="ph">OP-MONITOR</span><canvas id="forces"></canvas></div>
   </div>
@@ -760,10 +761,14 @@ function doll(m,player){
 }
 /* ticker A-D: each slot is its own tape — what pressing its tile would DO right
    now, plus context (crew, ground, threat) so a glance carries more than one line. */
+/* tape holds only text that changes rarely (verb names, phase, keyed weapon) —
+   fast-moving numbers (countdowns, %) go in the fixed badge so the scroll never
+   has to restart mid-cycle just because a second ticked over. */
 var tkLast=["","","",""], tkLetters=["A","B","C","D"];
-function tkSet(idx,items,hot){
+function tkSet(idx,items,hot,badge){
   var el=document.getElementById("tk"+tkLetters[idx]);
   el.className="tk"+(hot==="up"?" up":hot?" hot":"");
+  el.querySelector(".badge").textContent=badge||"";
   var text=items.join(" ◆ ");
   if (text===tkLast[idx]) return;                      // don't restart the scroll on no-op re-render
   tkLast[idx]=text;
@@ -776,22 +781,23 @@ function tkSet(idx,items,hot){
 }
 function renderTickers(){
   var q=me();
-  if (S.cue) tkSet(0,["<b>"+S.cue.verb+"</b> "+S.cue.cost, Math.ceil(S.cue.left)+"s to decide", S.cue.sq.name+" waiting on you"],"hot");
+  if (S.cue) tkSet(0,["<b>"+S.cue.verb+"</b> "+S.cue.cost, S.cue.sq.name+" waiting on you"],"hot",Math.ceil(S.cue.left)+"s");
   else tkSet(0,["no operative request pending", "141 op: "+q.phase.toLowerCase()]);
 
   var crew=q.crew.filter(function(m){return m.st==="OK";}).length;
-  tkSet(1,["141 "+(q.urge?"<b>URGED</b>":"steady"), (q.phase==="WORK"?q.op.name+" "+(q.prog|0)+"%":q.phase),
-            crew+"/4 crew standing"], q.urge?"up":false);
+  tkSet(1,["141 "+(q.urge?"<b>URGED</b>":"steady"), (q.phase==="WORK"?q.op.name:q.phase)],
+          q.urge?"up":false, crew+"/4");
 
-  var ck = S.mat>=3?["<b>ORBITAL LANCE</b> keyed","3 MAT on hand","vast area"]
-         : S.mat>=1?["<b>TOMAHAWK</b> keyed","1 MAT on hand","large area"]
+  var ck = S.mat>=3?["<b>ORBITAL LANCE</b> keyed","vast area"]
+         : S.mat>=1?["<b>TOMAHAWK</b> keyed","large area"]
          : ["no strike keys","earn MAT via espionage/uplink ops"];
-  tkSet(2,ck, S.mat>=1?"up":false);
+  tkSet(2,ck, S.mat>=1?"up":false, S.mat+" MAT");
 
   var mk = S.mechaUnit?["<b>MECHA fielded</b>","holding ground taken"]
-         : S.mechaCd>0?["mecha cooling "+(S.mechaCd|0)+"s"]
-         : S.req>=250?["<b>MECHA DROP</b> ready","250 req"]:["mecha ready","need 250 req (have "+(S.req|0)+")"];
-  tkSet(3,mk, (!S.mechaUnit&&S.mechaCd<=0&&S.req>=250)?"up":false);
+         : S.mechaCd>0?["mecha cooling"]
+         : S.req>=250?["<b>MECHA DROP</b> ready"]:["mecha ready — need 250 req"];
+  var badge4 = S.mechaCd>0?(S.mechaCd|0)+"s":(S.req|0)+"";
+  tkSet(3,mk, (!S.mechaUnit&&S.mechaCd<=0&&S.req>=250)?"up":false, badge4);
 }
 function renderDeck(){
   drawForces();
