@@ -22,7 +22,7 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 #device{width:100%;max-width:460px;height:100%;overflow:hidden;display:flex;flex-direction:column;gap:9px;
   padding:calc(6px + env(safe-area-inset-top)) 10px calc(8px + env(safe-area-inset-bottom))}
 /* islands: rounded cards, label lives inside the card as its first row */
-.panel{border:1px solid var(--line);background:var(--panel);border-radius:12px;
+.panel{border:1px solid var(--line);background:var(--panel);border-radius:5px;
   display:flex;flex-direction:column;overflow:hidden}
 .panel>.ph{flex:none;padding:7px 12px 3px;font-size:9px;letter-spacing:.18em;color:var(--dim)}
 .panel>canvas{flex:1;min-height:0}
@@ -34,21 +34,21 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 #ctrl{width:38%;flex:none;min-height:0;padding:0 10px 6px;gap:3px;overflow:hidden}
 #ctrlrow{display:flex;gap:6px;align-items:center;justify-content:space-between}
 #bclock{color:var(--ink);font-variant-numeric:tabular-nums;font-size:14px}
-#btnpause{background:transparent;border:1px solid var(--line);color:var(--ink);border-radius:7px;
+#btnpause{background:transparent;border:1px solid var(--line);color:var(--ink);border-radius:3px;
   font-family:var(--mono);font-size:11px;padding:2px 10px;touch-action:manipulation}
 #btnpause.on{border-color:var(--amber);color:var(--amber)}
 #tidepct{font-variant-numeric:tabular-nums;font-size:10px}
-#btnrecall{background:transparent;border:1px solid var(--line);color:var(--ink);border-radius:7px;
+#btnrecall{background:transparent;border:1px solid var(--line);color:var(--ink);border-radius:3px;
   font-family:var(--mono);font-size:10px;letter-spacing:.06em;padding:2px 8px;touch-action:manipulation}
 #btnrecall[disabled]{opacity:.28}
 #btnrecall.armed{border-color:var(--us);color:var(--us)}
 
 #mapwrap{height:30%;flex:none;padding:0 6px 6px}
-#map{width:100%;display:block;image-rendering:pixelated;touch-action:none;border-radius:6px}
+#map{width:100%;display:block;image-rendering:pixelated;touch-action:none;border-radius:3px}
 
 /* ticker: IMPORTANT events only */
 #ticker{flex:none;border:1px solid var(--amber);background:var(--bg);
-  overflow:hidden;height:24px;position:relative;border-radius:12px}
+  overflow:hidden;height:24px;position:relative;border-radius:5px}
 #tickmain{position:absolute;inset:0;width:100%;height:100%;display:block}
 #tickin .up{color:var(--us)} #tickin .bad{color:var(--foe)} #tickin .rq{color:var(--amber)}
 #tickin .sep{color:var(--line);padding:0 8px}
@@ -57,7 +57,7 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 #tickers{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:5px;overflow:hidden}
 /* each slot is its own ticker tape — same doubled-content marquee as the main
    ticker, so a slot can carry more than a single line can hold without truncating */
-.tk{flex:1;border:1px solid var(--line);background:var(--panel);border-radius:9px;
+.tk{flex:1;border:1px solid var(--line);background:var(--panel);border-radius:4px;
   display:flex;align-items:stretch;gap:0;min-height:0;position:relative;overflow:hidden}
 .tk .slot{color:var(--dim);border-right:1px solid var(--line);padding:0 6px;flex:none;
   font-size:9px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-width:22px}
@@ -73,7 +73,7 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 .strow .panel{flex:1;min-width:0;min-height:0;overflow:hidden}
 .strow .panel>div{flex:1;min-height:0;padding:0 10px 8px;overflow:hidden}
 .tile{width:24%;flex:none;background:var(--panel);border:1px solid var(--line);color:var(--ink);
-  border-radius:12px;font-family:var(--mono);font-size:13px;letter-spacing:.02em;padding:9px 10px;
+  border-radius:5px;font-family:var(--mono);font-size:12px;letter-spacing:.03em;padding:8px 9px;
   display:flex;flex-direction:column;justify-content:space-between;align-items:flex-start;
   text-align:left;touch-action:manipulation;overflow:hidden}
 .tile .k{font-size:9px;color:var(--dim);letter-spacing:.16em}
@@ -88,7 +88,7 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
   overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
   scrollbar-width:none}
 #squads::-webkit-scrollbar{display:none}
-.sq{border:1px solid var(--line);background:var(--bg);padding:4px 9px;border-radius:8px;
+.sq{border:1px solid var(--line);background:var(--bg);padding:4px 9px;border-radius:4px;
   display:grid;grid-template-columns:auto 1fr auto;gap:7px;align-items:baseline}
 .sq .nm{white-space:nowrap;font-size:11px;letter-spacing:.06em}
 .sq.mine{border-color:var(--us);padding:5px 9px}
@@ -185,7 +185,7 @@ function reset(){
       hotspots:[], hotTimer:0, designated:-1, designatedPt:null,
       cue:null, arm:[0,0,0,0,0], mon:null,
       mechaCd:0, mechaUnit:null,
-      kiaB:0, kiaO:0, opsDone:0,
+      kiaB:0, kiaO:0, opsDone:0, ff:0, domT:0, fx:[],
       troops:[],
       squads:[ mkSquad("141",1,true), mkSquad("BULL-6",1,false), mkSquad("RAZOR-2",1,false),
                mkSquad("KESSEL",-1,false), mkSquad("HARROW",-1,false) ],
@@ -289,11 +289,16 @@ function findHotspots(){
   hs.sort(function(a,b){return b.frac-a.frac;});
   S.hotspots=hs.slice(0,6);
 }
-function tideCalc(){
-  var g=0,n2=0;
-  for (var i=0;i<N;i+=5){ if (S.terr[i]) continue; g+=S.c[i]; n2++; }
-  return g/n2;
+/* ONE ground metric everywhere: fraction of decisively-held cells vs decisively-
+   lost. The verdict, the graph, the topbar, and the ledger all read this — the
+   player is never judged on a number different from the one they watched. */
+function groundPct(){
+  var held=0,lost=0;
+  for (var i=0;i<N;i+=5){ if (S.terr[i]) continue;
+    if (S.c[i]>0.5) held++; else if (S.c[i]<-0.5) lost++; }
+  return held/((held+lost)||1);
 }
+function tideCalc(){ return groundPct()*2-1; }   // same metric, graph-space [-1,1]
 function blast(cx,cy,rad,amt){
   for (var y=Math.max(0,cy-rad|0);y<Math.min(GH,cy+rad);y++)
     for (var x=Math.max(0,cx-rad|0);x<Math.min(GW,cx+rad);x++){
@@ -302,9 +307,14 @@ function blast(cx,cy,rad,amt){
       S.c[i]=Math.max(-1,Math.min(1,S.c[i]+amt*(1-dd/rad)));
     }
 }
+/* impact FX: expanding ring + flash where ordnance lands, so a strike is an
+   EVENT on the map, not just cells silently changing color. Big strikes also
+   jolt the theatre view for a beat. */
+function addFx(x,y,rad,kind){ S.fx.push({x:x,y:y,rad:rad,t:0,dur:kind==="strike"?1.1:0.6,kind:kind}); }
 /* LAOE ordnance: reshapes the map and does not check IFF.
    craters the height field, avalanches ridges flat, kills EVERYONE inside. */
 function strike(cx,cy,rad,amt){
+  addFx(cx,cy,rad,"strike");
   for (var y=Math.max(0,cy-rad|0);y<Math.min(GH,cy+rad);y++)
     for (var x=Math.max(0,cx-rad|0);x<Math.min(GW,cx+rad);x++){
       var dd=Math.hypot(x-cx,y-cy); if (dd>rad) continue;
@@ -327,6 +337,7 @@ function strike(cx,cy,rad,amt){
     if (Math.hypot(sq.x-cx,sq.y-cy)<rad && sq.side>0)
       teamHit(sq, sq.player?"OUR OWN ORDNANCE — danger close":"friendly ordnance");
   });
+  S.ff+=ff;
   if (ff>3) tick("strike caught our own line — "+ff+" friendly KIA","bad",true);
 }
 function bname(b){ return String.fromCharCode(65+b.y)+"-"+(b.x+1); }
@@ -387,13 +398,13 @@ function opComplete(sq){
   }
   if (!sq.player){ blast(cx,cy,7,sq.side*0.5); return; }
   switch (sq.op.id){
-    case "DA": blast(cx,cy,11,0.85); S.req+=100;
+    case "DA": blast(cx,cy,11,0.85); addFx(cx,cy,11,"blast"); S.req+=100;
       done("SABOTAGE executed — front broken","+100 req"); break;
     case "SR": S.mat++; S.req+=150; blast(cx,cy,4,0.2);
       done("ESPIONAGE haul secured","+1 MAT +150 req"); break;
     case "TG": S.mat+=2; blast(cx,cy,5,0.3);
       done("UPLINK hot — LAOE strike keys secured","+2 MAT"); break;
-    default:   blast(cx,cy,8,0.55); S.req+=60;
+    default:   blast(cx,cy,8,0.55); addFx(cx,cy,8,"blast"); S.req+=60;
       done("line assault carried","+60 req");
   }
   function done(msg,rw){
@@ -482,7 +493,7 @@ var REQ_POOLS={
         function(sq){S.req-=80;sq.prog+=30;tick("141: charges set — ahead of schedule","up");},
         function(sq){tick("141: copy — slow way then","team");}],
       ["CAS DANGER-CLOSE","−1 cas",function(){return S.cas>0;},
-        function(sq){S.cas--;sq.heat=0;tick("CAS inbound — keep heads down","rq",true);S.mon={kind:"CAS",label:"CAS RUN",t:0,dur:3.5, at:3.5*0.7, fx:function(){blast(sq.x,sq.y,8,0.5);tick("CAS in — danger close","up",true);}};},
+        function(sq){S.cas--;sq.heat=0;tick("CAS inbound — keep heads down","rq",true);S.mon={kind:"CAS",label:"CAS RUN",t:0,dur:3.5, at:3.5*0.7, fx:function(){blast(sq.x,sq.y,8,0.5);addFx(sq.x,sq.y,8,"blast");tick("CAS in — danger close","up",true);}};},
         function(sq){sq.prog=Math.max(0,sq.prog-15);tick("141: no air — breaking contact","team");}]],
   SR:[["APPROVE BRIBE","−100 req",function(){return S.req>=100;},
         function(sq){S.req-=100;sq.prog+=35;tick("141: asset paid — doors open","up");},
@@ -500,7 +511,7 @@ var REQ_POOLS={
         function(sq){S.req-=120;blast(sq.x,sq.y,6,0.35);tick("141: locals armed — line surging","up");},
         function(sq){tick("141: holding with what we have","team");}],
       ["CAS DANGER-CLOSE","−1 cas",function(){return S.cas>0;},
-        function(sq){S.cas--;sq.heat=0;tick("CAS inbound — keep heads down","rq",true);S.mon={kind:"CAS",label:"CAS RUN",t:0,dur:3.5, at:3.5*0.7, fx:function(){blast(sq.x,sq.y,8,0.5);tick("CAS in — danger close","up",true);}};},
+        function(sq){S.cas--;sq.heat=0;tick("CAS inbound — keep heads down","rq",true);S.mon={kind:"CAS",label:"CAS RUN",t:0,dur:3.5, at:3.5*0.7, fx:function(){blast(sq.x,sq.y,8,0.5);addFx(sq.x,sq.y,8,"blast");tick("CAS in — danger close","up",true);}};},
         function(sq){sq.prog=Math.max(0,sq.prog-15);}]],
 };
 function raiseRequest(sq){
@@ -563,22 +574,39 @@ function advance(dt){
   if (S.mon){ S.mon.t+=dt;
     if (S.mon.fx && !S.mon.fired && S.mon.t>=S.mon.at){ S.mon.fired=true; S.mon.fx(); }
     if (S.mon.t>=S.mon.dur) S.mon=null; }
+  for (var f6=S.fx.length-1;f6>=0;f6--){ S.fx[f6].t+=dt; if (S.fx[f6].t>=S.fx[f6].dur) S.fx.splice(f6,1); }
   S.req+=dt*2;
   S.tide=tideCalc(); S.hist.push(S.tide);
-  if (S.t<=0 || Math.abs(S.tide)>0.55) end();
+  // early end only on SUSTAINED dominance — a spike shouldn't end a theatre
+  var gp=(S.tide+1)/2;
+  if (gp>0.85||gp<0.15) S.domT+=dt; else S.domT=0;
+  if (S.t<=0 || S.domT>10) end();
 }
 function end(){
   S.over=true;
-  var v=S.tide>0.25?"LANDSLIDE — THEATRE TAKEN":S.tide>0?"MARGINAL HOLD":
-        S.tide>-0.25?"MARGINAL LOSS":"COLLAPSE";
+  var gp=groundPct();
+  // bands calibrated so ~60% ground is the AVERAGE sortie — a plain HOLD,
+  // not a headline. LANDSLIDE is reserved for genuinely abnormal outcomes.
+  var v = gp<0.45?"COLLAPSE — THEATRE LOST": gp<0.55?"CONTESTED — BELOW EXPECTATION":
+          gp<=0.70?"HOLD — SORTIE PAR": gp<=0.85?"DECISIVE — ABOVE THE LINE":
+          "LANDSLIDE — THEATRE TAKEN";
   document.getElementById("verdict").textContent=v;
+  // performance modifiers: named hooks, not a hidden weighted score
+  var mods=[];
+  if (S.kiaO>S.kiaB*2)  mods.push("EFFICIENT — kill ratio "+(S.kiaB?Math.round(S.kiaO/S.kiaB*10)/10:S.kiaO)+":1");
+  if (S.opsDone>=3)     mods.push("SURGICAL — "+S.opsDone+" ops completed behind the line");
+  if (S.kiaB>120)       mods.push("PYRRHIC — "+S.kiaB+" friendly KIA");
+  if (S.ff===0 && S.opsDone>0) mods.push("CLEAN HANDS — zero friendly-fire from ordnance");
+  var opforDown=S.squads.filter(function(q){return q.side<0&&q.phase==="DOWN";}).length;
+  if (opforDown===2)    mods.push("HOSTILE NET BROKEN — both opfor cells suppressed");
   var roster=S.squads[0].crew.map(function(m){
     var meds=m.medals.map(function(k){return MEDALS[k].ic;}).join("");
     return (m.st==="OK"?"▮":"▯")+" "+m.cs+(m.star?" ★":"")+" — "+ROLE_BY_ID[m.role].tag+" ("+m.wpn+") — "
       +m.ops+" op"+(m.ops===1?"":"s")+(meds?" "+meds:"");
   }).join("\n");
   document.getElementById("receipts").innerHTML=
-    "FINAL TIDE "+(S.tide*100).toFixed(0)+"% · REQ "+(S.req|0)+" · CAS "+S.cas+" · MAT "+S.mat
+    "GROUND "+(gp*100).toFixed(0)+"% (par 60%) · REQ "+(S.req|0)+" · CAS "+S.cas+" · MAT "+S.mat
+    +(mods.length?"\n"+mods.map(function(md){return "◈ "+md;}).join("\n"):"")
     +"\n\n<b>141 ROSTER</b>\n"+roster
     +"\n\n"+(S.receipts.length?S.receipts.join("\n"):"(no operations)");
   document.getElementById("debrief").classList.add("on");
@@ -644,9 +672,28 @@ function renderMap(){
   }
   bctx.putImageData(img,0,0);
   mctx.clearRect(0,0,mapC.width,mapC.height);
-  mctx.drawImage(buf,0,0,GW,GH,0,0,mapC.width,mapC.height);
+  // fresh big strike jolts the theatre view for a beat
+  var jx=0,jy=0;
+  S.fx.forEach(function(f2){ if (f2.kind==="strike"&&f2.t<0.18){
+    var ampl=(1-f2.t/0.18)*3;
+    jx=(Math.random()-0.5)*ampl*2; jy=(Math.random()-0.5)*ampl*2; } });
+  mctx.drawImage(buf,0,0,GW,GH,jx,jy,mapC.width,mapC.height);
   drawContours();
   var sx=mapC.width/GW, sy=mapC.height/GH, d=window.devicePixelRatio||1;
+  // impact rings: the detonation is an event, not a silent recolor
+  S.fx.forEach(function(f2){
+    var p2=f2.t/f2.dur, a2=1-p2;
+    var fxx=f2.x*sx, fxy=f2.y*sy, fr=f2.rad*sx*(0.25+0.75*p2);
+    mctx.strokeStyle=(f2.kind==="strike"?"rgba(255,182,61,":"rgba(216,255,61,")+(a2*0.9)+")";
+    mctx.lineWidth=Math.max(1,2*d*a2);
+    mctx.beginPath(); mctx.arc(fxx,fxy,fr,0,Math.PI*2); mctx.stroke();
+    if (f2.kind==="strike"){
+      mctx.strokeStyle="rgba(232,228,216,"+(a2*0.5)+")";
+      mctx.beginPath(); mctx.arc(fxx,fxy,fr*0.55,0,Math.PI*2); mctx.stroke();
+      if (p2<0.25){ mctx.fillStyle="rgba(255,236,200,"+((1-p2/0.25)*0.55)+")";
+        mctx.beginPath(); mctx.arc(fxx,fxy,fr*0.4,0,Math.PI*2); mctx.fill(); }
+    }
+  });
 
   mctx.textAlign="center"; mctx.textBaseline="middle";
   S.hotspots.forEach(function(h){
@@ -712,7 +759,13 @@ function renderTrend(){
   var span=Math.max(0.14,(hi-lo)*1.25), mid=(hi+lo)/2;
   function yOf(v){ return H/2-(v-mid)/span*H*0.86; }
   tctx.strokeStyle="#34343c"; tctx.setLineDash([3,4]);
-  tctx.beginPath(); tctx.moveTo(0,yOf(0)); tctx.lineTo(W-PADR,yOf(0)); tctx.stroke(); tctx.setLineDash([]);
+  tctx.beginPath(); tctx.moveTo(0,yOf(0)); tctx.lineTo(W-PADR,yOf(0)); tctx.stroke();
+  // PAR: the average-sortie line (60% ground). Beat it or explain yourself.
+  tctx.strokeStyle="#4a4a3a";
+  tctx.beginPath(); tctx.moveTo(0,yOf(0.2)); tctx.lineTo(W-PADR,yOf(0.2)); tctx.stroke();
+  tctx.setLineDash([]);
+  tctx.fillStyle="#8a8778"; tctx.font=(8*(window.devicePixelRatio||1))+"px monospace";
+  tctx.textAlign="left"; tctx.fillText("PAR",W-PADR+3,yOf(0.2)+3);
   tctx.strokeStyle=S.tide>=0?"#d8ff3d":"#ff5a2a"; tctx.lineWidth=2;
   tctx.beginPath();
   for (var k2=0;k2<n2;k2++){ tctx.lineTo(k2/(n2-1)*(W-PADR),yOf(S.hist[k2])); }
@@ -1062,23 +1115,21 @@ function renderDeck(){
   }).join(" · ");
   document.getElementById("squads").innerHTML = mineHtml
     +'<div id="alliedline">'+alliedHtml+'</div>';
-  // voxel stats: macro story
-  var held=0,lost=0;
-  for (var i=0;i<N;i+=5){ if (S.terr[i]) continue;
-    if (S.c[i]>0.5) held++; else if (S.c[i]<-0.5) lost++; }
-  var tot=held+lost||1;
+  // voxel stats: macro story — same groundPct the verdict uses
+  var gpL=groundPct();
   var lastOp=S.receipts.length?S.receipts[S.receipts.length-1]:"no operations logged yet";
   document.getElementById("ledger").innerHTML=
     '<div class="lrow"><span>REQ / CAS / MAT</span><span><b>'+(S.req|0)+'</b> / <b>'+S.cas+'</b> / <b>'+S.mat+'</b></span></div>'
-    +'<div class="lrow"><span>GROUND</span><span><b class="up">'+Math.round(held/tot*100)+'%</b> / <b class="bad">'+Math.round(lost/tot*100)+'%</b></span></div>'
+    +'<div class="lrow"><span>GROUND (par 60)</span><span><b class="up">'+Math.round(gpL*100)+'%</b> / <b class="bad">'+Math.round((1-gpL)*100)+'%</b></span></div>'
     +'<div class="lrow"><span>LINE KIA</span><span><b class="up">'+S.kiaB+'</b> / <b class="bad">'+S.kiaO+'</b></span></div>'
     +'<div class="lrow"><span>OPS DONE</span><span><b>'+S.opsDone+'</b> · ELAPSED <b>'+(180-S.t|0)+'s</b></span></div>'
     +'<div class="lrow"><span>HOSTILE NET</span><span><b class="bad">'+hos+'</b> active cell'+(hos===1?"":"s")+'</span></div>'
     +'<div style="margin-top:2px;border-top:1px dashed var(--line);padding-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+lastOp+'</div>';
   document.getElementById("bclock").textContent=Math.max(0,S.t).toFixed(0);
   var tp=document.getElementById("tidepct");
-  tp.textContent="TIDE "+(S.tide>=0?"+":"")+(S.tide*100).toFixed(0)+"%";
-  tp.style.color=S.tide>=0?"#d8ff3d":"#ff5a2a";
+  var gp2=(S.tide+1)/2;
+  tp.textContent="GND "+(gp2*100).toFixed(0)+"%";
+  tp.style.color=gp2>=0.55?"#d8ff3d":gp2>=0.45?"#ffb63d":"#ff5a2a";
   renderButtons();
 }
 
