@@ -171,7 +171,8 @@ function reset(){
                mkSquad("KESSEL",-1,false), mkSquad("HARROW",-1,false) ],
   };
   for (var k=0;k<TN;k++) S.troops.push(mkTroop(k%2?1:-1));
-  genTerrain();
+  S.h=new Float32Array(N);
+  genTerrain(); genHeight();
   for (var y=0;y<GH;y++) for (var x=0;x<GW;x++){
     var i=y*GW+x; if (S.terr[i]) continue;
     S.c[i] = x<4 ? 0.95 : x>=GW-4 ? -0.95 : 0;
@@ -195,6 +196,21 @@ function genTerrain(){
       var d=Math.random();
       if (d<0.42) y++; else if (d<0.84) y--; else x+=Math.random()<0.5?1:-1;
     }
+  }
+}
+/* heightmap: coarse random grid, bilinear upsample; ridges sit on high ground.
+   contours render from this; movement and weapons read it. */
+function genHeight(){
+  var CG=17, CH2=11, coarse=new Float32Array(CG*CH2);
+  for (var k=0;k<coarse.length;k++) coarse[k]=Math.random();
+  for (var y=0;y<GH;y++) for (var x=0;x<GW;x++){
+    var gx=x/(GW-1)*(CG-1), gy=y/(GH-1)*(CH2-1);
+    var x0=gx|0, y0=gy|0, fx=gx-x0, fy=gy-y0;
+    var x1=Math.min(CG-1,x0+1), y1=Math.min(CH2-1,y0+1);
+    var v=coarse[y0*CG+x0]*(1-fx)*(1-fy)+coarse[y0*CG+x1]*fx*(1-fy)
+         +coarse[y1*CG+x0]*(1-fx)*fy+coarse[y1*CG+x1]*fx*fy;
+    var i=y*GW+x;
+    S.h[i]=Math.min(1, v*0.85 + (S.terr[i]?0.35:0));   // ridges crown the hills
   }
 }
 function caStep(){
@@ -239,6 +255,32 @@ function blast(cx,cy,rad,amt){
       S.c[i]=Math.max(-1,Math.min(1,S.c[i]+amt*(1-dd/rad)));
     }
 }
+/* LAOE ordnance: reshapes the map and does not check IFF.
+   craters the height field, avalanches ridges flat, kills EVERYONE inside. */
+function strike(cx,cy,rad,amt){
+  for (var y=Math.max(0,cy-rad|0);y<Math.min(GH,cy+rad);y++)
+    for (var x=Math.max(0,cx-rad|0);x<Math.min(GW,cx+rad);x++){
+      var dd=Math.hypot(x-cx,y-cy); if (dd>rad) continue;
+      var i=y*GW+x, fall=1-dd/rad;
+      S.h[i]=Math.max(0,S.h[i]-fall*0.55);                 // crater
+      if (S.terr[i] && dd<rad*0.8) S.terr[i]=0;            // ridge avalanched flat
+      if (!S.terr[i]) S.c[i]=Math.max(-1,Math.min(1,S.c[i]*0.25+amt*fall));
+    }
+  var ff=0;
+  S.troops.forEach(function(tr){                           // friendly fire is fire
+    if (tr.dead>0) return;
+    if (Math.hypot(tr.x-cx,tr.y-cy)<rad){
+      tr.dead=4+Math.random()*4;
+      if (tr.side>0){ S.kiaB++; ff++; } else S.kiaO++;
+    }
+  });
+  S.squads.forEach(function(sq){
+    if (sq.phase==="DOWN"||sq.phase==="STAGING") return;
+    if (Math.hypot(sq.x-cx,sq.y-cy)<rad && sq.side>0)
+      teamHit(sq, sq.player?"OUR OWN ORDNANCE — danger close":"friendly ordnance");
+  });
+  if (ff>3) tick("strike caught our own line — "+ff+" friendly KIA","bad",true);
+}
 function bname(b){ return String.fromCharCode(65+b.y)+"-"+(b.x+1); }
 
 /* ============ line troops: the default force. they ARE the push ============ */
@@ -249,12 +291,13 @@ function troopTick(tr,dt){
   var i=(tr.y|0)*GW+(tr.x|0);
   var here=(i>=0&&i<N)?S.c[i]:0;
   var owned=here*tr.side;
+  var slope=1-(S.h[i]||0)*0.55;                      // high ground is slow ground
   if (owned>0.35){                                   // rear area: march to the front
     tr.jig+=dt*3;
-    tr.x+=tr.side*dt*(4+Math.sin(tr.jig)); tr.y+=Math.cos(tr.jig*0.7)*dt*2.5;
+    tr.x+=tr.side*dt*(4+Math.sin(tr.jig))*slope; tr.y+=Math.cos(tr.jig*0.7)*dt*2.5*slope;
   } else {                                           // at the front: fight for the cell
     if (!S.terr[i]&&i>=0&&i<N) S.c[i]=Math.max(-1,Math.min(1,S.c[i]+tr.side*dt*0.55));
-    tr.x+=tr.side*dt*0.7; tr.y+=(Math.random()-0.5)*dt*3;
+    tr.x+=tr.side*dt*0.7*slope; tr.y+=(Math.random()-0.5)*dt*3;
     var danger=Math.max(0,-here*tr.side);
     if (Math.random()<dt*(0.02+danger*0.10)){ tr.dead=3+Math.random()*4;  // fall, respawn
       if (tr.side>0) S.kiaB++; else S.kiaO++; }
@@ -348,11 +391,12 @@ function pickObjective(sq){
 }
 function teamHit(sq,why){
   sq.hp--; sq.heat=Math.max(0,sq.heat-6);
-  tick("141: man down — "+why,"bad",true);
-  S.receipts.push("▼ 141 casualty — "+why);
-  if (sq.hp<=0){ sq.phase="DOWN"; sq.pt=20; sq.morale=Math.max(0.5,sq.morale-0.2); S.cue=null;
-    tick("141 COMBAT INEFFECTIVE — extracting under fire","bad",true);
-    S.receipts.push("██ 141 wiped to extraction — refit, morale down.");
+  tick(sq.name+": man down — "+why,"bad",true);
+  S.receipts.push("▼ "+sq.name+" casualty — "+why);
+  if (sq.hp<=0){ sq.phase="DOWN"; sq.pt=20; sq.morale=Math.max(0.5,sq.morale-0.2);
+    if (sq.player) S.cue=null;
+    tick(sq.name+" COMBAT INEFFECTIVE — extracting under fire","bad",true);
+    S.receipts.push("██ "+sq.name+" wiped to extraction — refit, morale down.");
   }
 }
 var REQ_POOLS={
@@ -394,6 +438,7 @@ function mechaTick(dt){
   if (S.mechaCd>0) S.mechaCd-=dt;
   var m=S.mechaUnit; if (!m) return;
   m.t+=dt;
+  if (m.t<0.2 && !m.landed){ m.landed=true; strike(m.x,m.y,9,0.5); } // impact craters, no IFF
   if (m.t<4){ blast(m.x,m.y,3+m.t*2.5,0.28*dt*8); }        // landing shock, area clears
   else if (m.t<14){ blast(m.x,m.y,4,0.06*dt*8); }          // holds the ground it took
   else { S.mechaUnit=null; tick("mecha expended — wreck holds the line","team",true); }
@@ -410,11 +455,11 @@ function fireLAOE(kind){
     tick("MECHA DROP — clearing the grid square","up",true); mark("MEC",true);
     S.receipts.push("◈ MECHA deployed @ front — area cleared and held");
   } else if (kind==="TOMAHAWK"){
-    blast(tgt.x,tgt.y,10,0.7);
-    tick("TOMAHAWK impact — hostile mass erased","up",true); mark("TMH",true);
+    strike(tgt.x,tgt.y,10,0.7);
+    tick("TOMAHAWK impact — terrain cratered","up",true); mark("TMH",true);
     S.receipts.push("◈ TOMAHAWK strike (1 MAT)");
   } else {
-    blast(tgt.x,tgt.y,16,0.9);
+    strike(tgt.x,tgt.y,16,0.9);
     tick("ORBITAL LANCE — the map remembers this","up",true); mark("ORB",true);
     S.receipts.push("◈ ORBITAL strike (3 MAT)");
   }
@@ -455,6 +500,11 @@ function renderMap(){
     if (v>0.05){ var g=0.2+v*0.62; px[o]=216*g; px[o+1]=255*g; px[o+2]=61*g; }
     else if (v<-0.05){ var f=0.2-v*0.62; px[o]=255*f; px[o+1]=90*f; px[o+2]=42*f; }
     else { px[o]=32;px[o+1]=33;px[o+2]=38; }
+    // topographic contours: faint line wherever the elevation band steps
+    var x2=i%GW, lvl=(S.h[i]*5)|0;
+    if ((x2<GW-1 && ((S.h[i+1]*5)|0)!==lvl) || (i<N-GW && ((S.h[i+GW]*5)|0)!==lvl)){
+      px[o]=px[o]*0.72+232*0.28|0; px[o+1]=px[o+1]*0.72+228*0.28|0; px[o+2]=px[o+2]*0.72+216*0.28|0;
+    }
     px[o+3]=255;
   }
   // troops as bright motes — the war is visibly made of people
