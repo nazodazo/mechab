@@ -38,8 +38,11 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 .wpn .mk{font-size:10px;color:var(--dim)}
 .wpn.on{border-color:var(--us)} .wpn.on .k{color:var(--us)}
 
-/* spectral display: the high-resolution gauge */
-#specwrap{flex:1.2;min-height:0;padding:0 8px 8px}
+/* the three cluster gauges: dense voxel matrices, ~2k dots, gradient fill */
+#gaugewrap{flex:0.9;min-height:0;padding:0 8px 8px}
+#gauges{width:100%;height:100%;display:block}
+/* spectral display: the high-resolution mix vs target */
+#specwrap{flex:1;min-height:0;padding:0 8px 8px}
 #spec{width:100%;height:100%;display:block}
 
 /* mixer: 4 oscillator channel cards */
@@ -78,6 +81,7 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
   <div id="weapons">
     <button class="wpn" id="w0"></button><button class="wpn" id="w1"></button><button class="wpn" id="w2"></button>
   </div>
+  <div class="card" id="gaugewrap"><span class="ph">BAND GAUGES — LOW / MID / HIGH cluster fit</span><canvas id="gauges"></canvas></div>
   <div class="card" id="specwrap"><span class="ph">SPECTRUM — shape the mix onto the target curve</span><canvas id="spec"></canvas></div>
   <div id="mixer"></div>
   <div id="commit">
@@ -173,6 +177,47 @@ function drawSpec(){
     sctx.fillText(String.fromCharCode(65+k),cx,base+10*d);
   });
 }
+/* the original three cluster gauges, reborn as dense voxel matrices.
+   Each cluster is one spectral band (LOW/MID/HIGH). ~2k dots total; the fill
+   climbs bottom-up with dithered edges so it reads as a texture gradient,
+   not a bar. Green = band in tolerance, red = running hot, dim = cold. */
+var gauges=document.getElementById("gauges"), gctx=gauges.getContext("2d");
+function hash2(a,b){ var h=(a*374761393+b*668265263)^(a<<7); h=(h^(h>>13))*1274126177;
+  return ((h^(h>>16))>>>0)/4294967295; }
+function bandStats(lo,hi){
+  var err=0,tot=0,bias=0,n=0;
+  for (var b=0;b<BINS;b++){ var x=b/BINS; if (x<lo||x>=hi) continue;
+    var t=WEAPONS[cur].tgt(b), m=mixAt(x);
+    err+=Math.abs(m-t); tot+=t; bias+=(m-t); n++; }
+  return { fit:Math.max(0,1-err/(tot||1)), hot:bias/(n||1)>0.08, cold:bias/(n||1)<-0.08 };
+}
+function drawGauges(){
+  fitCanvas(gauges);
+  var W=gauges.width,H=gauges.height,d=window.devicePixelRatio||1;
+  gctx.clearRect(0,0,W,H);
+  var names=["LOW","MID","HIGH"], gap=10*d, gw=(W-gap*4)/3;
+  var COLS=26, ROWS=26;                          // 3 × 676 ≈ 2k voxels
+  for (var g=0;g<3;g++){
+    var st=bandStats(g/3,(g+1)/3);
+    var gx0=gap+g*(gw+gap), gy0=6*d, gh=H-22*d;
+    var cw=gw/COLS, chh=gh/ROWS;
+    var base = st.hot?[255,90,42] : st.cold?[122,120,106] : [216,255,61];
+    for (var iy=0;iy<ROWS;iy++){
+      var level=1-(iy+0.5)/ROWS;                 // bottom row = level 0
+      for (var ix=0;ix<COLS;ix++){
+        var dz=hash2(ix+g*31,iy)*0.14-0.07;      // dithered edge
+        var on = st.fit >= level+dz;
+        var a = on ? 0.25+0.75*(1-level*0.8)     // gradient: brighter low, fading high
+                   : 0.05+hash2(ix+g*77,iy+13)*0.05;  // faint idle texture
+        gctx.fillStyle="rgba("+base[0]+","+base[1]+","+base[2]+","+(on?a:0.07)+")";
+        var sz=(on?0.62:0.3)*Math.min(cw,chh);
+        gctx.fillRect(gx0+ix*cw+(cw-sz)/2, gy0+iy*chh+(chh-sz)/2, sz, sz);
+      }
+    }
+    gctx.fillStyle="#8a8778"; gctx.font=(8*d)+"px monospace"; gctx.textAlign="center";
+    gctx.fillText(names[g]+" "+Math.round(st.fit*100), gx0+gw/2, H-6*d);
+  }
+}
 function renderWeapons(){
   WEAPONS.forEach(function(w,k){
     var el=document.getElementById("w"+k);
@@ -214,11 +259,11 @@ document.getElementById("mixer").addEventListener("click",function(e){
   var c=CH[+b.dataset.ch], p=b.dataset.p, dl=+b.dataset.d;
   var step = p==="f"?0.02 : p==="w"?0.01 : 0.05;
   c[p]=Math.max(0,Math.min(p==="f"?1:p==="w"?0.3:1.2, c[p]+dl*step));
-  renderMixer(); renderFit(); drawSpec();
+  renderMixer(); renderFit(); drawSpec(); drawGauges();
 });
 WEAPONS.forEach(function(w,k){
   document.getElementById("w"+k).addEventListener("click",function(){
-    cur=k; loadCh(); renderWeapons(); renderMixer(); renderFit(); drawSpec();
+    cur=k; loadCh(); renderWeapons(); renderMixer(); renderFit(); drawSpec(); drawGauges();
   });
 });
 var burnEl=document.getElementById("burn");
@@ -235,8 +280,8 @@ burnEl.addEventListener("click",function(){
 setInterval(function(){ if (armT>0){ armT-=0.1;
   if (armT<=0){ burnEl.classList.remove("armed"); burnEl.textContent="BURN-IN CALIBRATION"; } } },100);
 
-loadCh(); renderWeapons(); renderMixer(); renderFit(); drawSpec();
-window.addEventListener("resize",drawSpec);
+loadCh(); renderWeapons(); renderMixer(); renderFit(); drawSpec(); drawGauges();
+window.addEventListener("resize",function(){drawSpec();drawGauges();});
 </script>
 </body>
 </html>
