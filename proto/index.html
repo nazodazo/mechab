@@ -49,9 +49,7 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 /* ticker: IMPORTANT events only */
 #ticker{flex:none;border:1px solid var(--amber);background:var(--bg);
   overflow:hidden;height:24px;position:relative;border-radius:12px}
-#tickwrap{position:absolute;inset:0}
-#tickwrap .tkin{position:absolute;left:0;top:0;white-space:nowrap;line-height:22px;font-size:11px;
-  will-change:transform}
+#tickmain{position:absolute;inset:0;width:100%;height:100%;display:block}
 #tickin .up{color:var(--us)} #tickin .bad{color:var(--foe)} #tickin .rq{color:var(--amber)}
 #tickin .sep{color:var(--line);padding:0 8px}
 /* mid row: ticker A-D (slot informatics, left) + OP-MONITOR (right) */
@@ -64,13 +62,9 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 .tk .slot{color:var(--dim);border-right:1px solid var(--line);padding:0 6px;flex:none;
   font-size:9px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-width:22px}
 .tk .badge{font-size:9px;color:var(--ink);font-variant-numeric:tabular-nums}
-.tk .tape{flex:1;position:relative;overflow:hidden;min-width:0}
-.tk .tkin{position:absolute;left:0;top:0;height:100%;display:flex;align-items:center;
-  white-space:nowrap;font-size:10px;color:var(--dim);padding:0 8px;will-change:transform}
-.tk .tkin b{color:var(--ink);font-weight:400}
-.tk .tkin .sep{color:var(--line);padding:0 8px}
-.tk.hot .slot{color:var(--amber);border-color:var(--amber)} .tk.hot .tkin b{color:var(--amber)}
-.tk.up .slot{color:var(--us);border-color:var(--us)} .tk.up .tkin b{color:var(--us)}
+.tk .tape{flex:1;min-width:0;width:100%;height:100%;display:block}
+.tk.hot .slot{color:var(--amber);border-color:var(--amber)}
+.tk.up .slot{color:var(--us);border-color:var(--us)}
 #monwrap{width:45%;flex:none;min-height:0;padding:0 6px 6px;overflow:hidden}
 #forces{width:100%;height:100%;display:block;background:var(--bg);image-rendering:pixelated}
 
@@ -126,13 +120,13 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
     </div>
   </div>
   <div id="mapwrap" class="panel"><span class="ph">THEATRE — tap to designate 141's objective</span><canvas id="map"></canvas></div>
-  <div id="ticker"><div id="tickwrap"></div></div>
+  <div id="ticker"><canvas id="tickmain"></canvas></div>
   <div id="midrow">
     <div id="tickers">
-      <div class="tk" id="tkA"><span class="slot">A<span class="badge"></span></span><div class="tape"></div></div>
-      <div class="tk" id="tkB"><span class="slot">B<span class="badge"></span></span><div class="tape"></div></div>
-      <div class="tk" id="tkC"><span class="slot">C<span class="badge"></span></span><div class="tape"></div></div>
-      <div class="tk" id="tkD"><span class="slot">D<span class="badge"></span></span><div class="tape"></div></div>
+      <div class="tk" id="tkA"><span class="slot">A<span class="badge"></span></span><canvas class="tape"></canvas></div>
+      <div class="tk" id="tkB"><span class="slot">B<span class="badge"></span></span><canvas class="tape"></canvas></div>
+      <div class="tk" id="tkC"><span class="slot">C<span class="badge"></span></span><canvas class="tape"></canvas></div>
+      <div class="tk" id="tkD"><span class="slot">D<span class="badge"></span></span><canvas class="tape"></canvas></div>
     </div>
     <div id="monwrap" class="panel"><span class="ph">OP-MONITOR</span><canvas id="forces"></canvas></div>
   </div>
@@ -629,44 +623,65 @@ function renderTrend(){
   });
 }
 
-/* ============ ticker (important) + two-line stepping overview ============ */
-/* true single-flow marquee: two identical copies placed exactly one content-width
-   apart, both driven by the same offset. When the lead copy exits, the trailing
-   copy is already sitting at position 0 — no seam, no snap, just one flow. */
-var MQ={ main:{w:0,off:0,speed:32}, A:{w:0,off:0,speed:26}, B:{w:0,off:0,speed:26},
-         C:{w:0,off:0,speed:26}, D:{w:0,off:0,speed:26} };
-function mqFill(wrap,html){
-  // as many copies as it takes to cover the container plus one spare, so the
-  // tape is continuous even when the text is shorter than the window
-  wrap.innerHTML='<div class="tkin"></div>';
-  wrap.children[0].innerHTML=html;
-  var w=wrap.children[0].scrollWidth||1, cw=wrap.clientWidth||1;
-  var need=Math.max(2,Math.ceil(cw/w)+1);
-  for (var k=1;k<need;k++){
-    var c=document.createElement("div"); c.className="tkin"; c.innerHTML=html;
-    wrap.appendChild(c);
+/* ============ ticker tapes: canvas-drawn, from scratch ============ */
+/* A tape is a list of colored text runs drawn onto a canvas at x = -offset and
+   repeated until the window is filled. The scroll is one modulo counter; there
+   is nothing to measure but ctx.measureText and nothing to seam. Content can
+   change mid-scroll without touching the offset. */
+var TAPE_COL={ up:"#d8ff3d", bad:"#ff5a2a", rq:"#ffb63d", team:"#e8e4d8",
+               ink:"#e8e4d8", dim:"#8a8778", sep:"#4a4a54" };
+function mkTape(canvas,fontPx,speed){
+  return { c:canvas, ctx:canvas.getContext("2d"), fontPx:fontPx, speed:speed,
+           runs:[], w:0, off:0, dirty:true };
+}
+function tapeSet(tp,runs){ tp.runs=runs; tp.dirty=true; }
+function tapeDraw(tp,dt){
+  var c=tp.c, r=c.getBoundingClientRect();
+  if (!r.width) return;
+  var d=window.devicePixelRatio||1, cw=Math.round(r.width*d), ch=Math.round(r.height*d);
+  if (c.width!==cw||c.height!==ch){ c.width=cw; c.height=ch; tp.dirty=true; }
+  var ctx=tp.ctx, font=(tp.fontPx*d)+"px "+'"SF Mono",ui-monospace,Consolas,monospace';
+  ctx.font=font; ctx.textBaseline="middle";
+  if (tp.dirty){                                   // re-measure one cycle's width
+    var w=0;
+    for (var k=0;k<tp.runs.length;k++) w+=ctx.measureText(tp.runs[k].t).width;
+    tp.w=Math.max(1,w); tp.dirty=false;
+    if (tp.off>=tp.w) tp.off%=tp.w;
   }
-  return w;
+  tp.off+=tp.speed*d*dt; if (tp.off>=tp.w) tp.off-=tp.w;
+  ctx.clearRect(0,0,cw,ch);
+  var y=ch/2, x=-tp.off;
+  while (x<cw){                                    // repeat the cycle across the window
+    for (var k2=0;k2<tp.runs.length;k2++){
+      var run=tp.runs[k2], rw=ctx.measureText(run.t).width;
+      if (x+rw>0 && x<cw){ ctx.fillStyle=run.col; ctx.fillText(run.t,x,y); }
+      x+=rw;
+    }
+  }
+}
+var TAPES={};
+function initTapes(){
+  TAPES.main=mkTape(document.getElementById("tickmain"),11,34);
+  ["A","B","C","D"].forEach(function(L){
+    TAPES[L]=mkTape(document.querySelector("#tk"+L+" .tape"),10,26);
+  });
+}
+function runsFrom(items){                          // items: [text, colorKey] pairs
+  var runs=[];
+  items.forEach(function(it){
+    runs.push({t:it[0],col:TAPE_COL[it[1]]||TAPE_COL.dim});
+    runs.push({t:"  ◆  ",col:TAPE_COL.sep});
+  });
+  return runs;
 }
 function tickMarquees(dt){
-  ["main","A","B","C","D"].forEach(function(key){
-    var m=MQ[key]; if (m.w<=0) return;
-    m.off+=m.speed*dt; if (m.off>=m.w) m.off-=m.w;
-    var wrap = key==="main" ? document.getElementById("tickwrap")
-                            : document.querySelector("#tk"+key+" .tape");
-    if (!wrap) return;
-    for (var k=0;k<wrap.children.length;k++)
-      wrap.children[k].style.transform="translateX("+(k*m.w-m.off)+"px)";
-  });
+  for (var key in TAPES) tapeDraw(TAPES[key],dt);
 }
 var ticks=[];
 function tick(m,cls,important){
   if (important){
     ticks.unshift({m:m,cls:cls||""}); if (ticks.length>6) ticks.pop();
-    var html=ticks.map(function(t2){
-      return '<span class="'+t2.cls+'">'+t2.m+'</span>'; }).join('<span class="sep">◆</span>')
-      +'<span class="sep">◆</span>';
-    MQ.main.w=mqFill(document.getElementById("tickwrap"),html); MQ.main.off=0;
+    tapeSet(TAPES.main,runsFrom(ticks.map(function(t2){return [t2.m,t2.cls];})));
   }
 }
 
@@ -788,39 +803,35 @@ function doll(m,player){
 }
 /* ticker A-D: each slot is its own tape — what pressing its tile would DO right
    now, plus context (crew, ground, threat) so a glance carries more than one line. */
-/* tape holds only text that changes rarely (verb names, phase, keyed weapon) —
-   fast-moving numbers (countdowns, %) go in the fixed badge so the scroll never
-   has to restart mid-cycle just because a second ticked over. */
+/* slot tapes hold only text that changes rarely (verb names, phase, keyed
+   weapon) — fast-moving numbers (countdowns, %) go in the fixed badge. */
 var tkLast=["","","",""], tkLetters=["A","B","C","D"];
 function tkSet(idx,items,hot,badge){
-  var el=document.getElementById("tk"+tkLetters[idx]);
+  var L=tkLetters[idx], el=document.getElementById("tk"+L);
   el.className="tk"+(hot==="up"?" up":hot?" hot":"");
   el.querySelector(".badge").textContent=badge||"";
-  var text=items.join(" ◆ ");
-  if (text===tkLast[idx]) return;                      // don't restart the scroll on no-op re-render
+  var text=items.map(function(it){return it[0];}).join("◆");
+  if (text===tkLast[idx]) return;
   tkLast[idx]=text;
-  var html=items.map(function(t2){return '<span>'+t2+'</span>';}).join('<span class="sep">◆</span>')
-    +'<span class="sep">◆</span>';
-  var key=tkLetters[idx];
-  MQ[key].w=mqFill(el.querySelector(".tape"),html); MQ[key].off=0;
+  tapeSet(TAPES[L],runsFrom(items));
 }
 function renderTickers(){
   var q=me();
-  if (S.cue) tkSet(0,["<b>"+S.cue.verb+"</b> "+S.cue.cost, S.cue.sq.name+" waiting on you"],"hot",Math.ceil(S.cue.left)+"s");
-  else tkSet(0,["no operative request pending", "141 op: "+q.phase.toLowerCase()]);
+  if (S.cue) tkSet(0,[[S.cue.verb+" "+S.cue.cost,"rq"],[S.cue.sq.name+" waiting on you","dim"]],"hot",Math.ceil(S.cue.left)+"s");
+  else tkSet(0,[["no operative request pending","dim"],["141 op: "+q.phase.toLowerCase(),"dim"]]);
 
   var crew=q.crew.filter(function(m){return m.st==="OK";}).length;
-  tkSet(1,["141 "+(q.urge?"<b>URGED</b>":"steady"), (q.phase==="WORK"?q.op.name:q.phase)],
+  tkSet(1,[["141 "+(q.urge?"URGED":"steady"),q.urge?"up":"ink"],[(q.phase==="WORK"?q.op.name:q.phase),"dim"]],
           q.urge?"up":false, crew+"/4");
 
-  var ck = S.mat>=3?["<b>ORBITAL LANCE</b> keyed","vast area"]
-         : S.mat>=1?["<b>TOMAHAWK</b> keyed","large area"]
-         : ["no strike keys","earn MAT via espionage/uplink ops"];
+  var ck = S.mat>=3?[["ORBITAL LANCE keyed","up"],["vast area","dim"]]
+         : S.mat>=1?[["TOMAHAWK keyed","up"],["large area","dim"]]
+         : [["no strike keys","dim"],["earn MAT via espionage/uplink ops","dim"]];
   tkSet(2,ck, S.mat>=1?"up":false, S.mat+" MAT");
 
-  var mk = S.mechaUnit?["<b>MECHA fielded</b>","holding ground taken"]
-         : S.mechaCd>0?["mecha cooling"]
-         : S.req>=250?["<b>MECHA DROP</b> ready"]:["mecha ready — need 250 req"];
+  var mk = S.mechaUnit?[["MECHA fielded","up"],["holding ground taken","dim"]]
+         : S.mechaCd>0?[["mecha cooling","dim"]]
+         : S.req>=250?[["MECHA DROP ready","up"]]:[["mecha ready — need 250 req","dim"]];
   var badge4 = S.mechaCd>0?(S.mechaCd|0)+"s":(S.req|0)+"";
   tkSet(3,mk, (!S.mechaUnit&&S.mechaCd<=0&&S.req>=250)?"up":false, badge4);
 }
@@ -928,7 +939,7 @@ function loop(now){
   tickMarquees(dt);
   requestAnimationFrame(loop);
 }
-fit(mapC); fit(trC); fit(fcC); reset(); requestAnimationFrame(loop);
+fit(mapC); fit(trC); fit(fcC); initTapes(); reset(); requestAnimationFrame(loop);
 </script>
 </body>
 </html>
