@@ -25,19 +25,24 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 .panel>.ph{position:absolute;top:-1px;left:8px;transform:translateY(-50%);
   background:var(--bg);padding:0 6px;font-size:9px;letter-spacing:.18em;color:var(--dim)}
 
-#topbar{display:flex;gap:8px;align-items:baseline;color:var(--dim);font-size:11px;
-  letter-spacing:.08em;padding:0 2px}
-#bclock{color:var(--ink);font-variant-numeric:tabular-nums}
-#phase{flex:1;text-align:center;overflow:hidden;white-space:nowrap}
+/* top row: tide trend (left) + controls (right) */
+#toprow{flex:none;height:9%;display:flex;gap:8px}
+#trendwrap{flex:1;padding:5px 6px;min-width:0}
+#trend{width:100%;height:100%;display:block}
+#ctrl{width:38%;flex:none;padding:8px 8px 4px;display:flex;flex-direction:column;gap:2px}
+#ctrlrow{display:flex;gap:6px;align-items:center;justify-content:space-between}
+#bclock{color:var(--ink);font-variant-numeric:tabular-nums;font-size:14px}
 #btnpause{background:transparent;border:1px solid var(--line);color:var(--ink);
   font-family:var(--mono);font-size:11px;padding:2px 10px;touch-action:manipulation}
 #btnpause.on{border-color:var(--amber);color:var(--amber)}
-#tidepct{font-variant-numeric:tabular-nums}
+#tidepct{font-variant-numeric:tabular-nums;font-size:10px}
+#btnrecall{background:transparent;border:1px solid var(--line);color:var(--ink);
+  font-family:var(--mono);font-size:10px;letter-spacing:.06em;padding:2px 8px;touch-action:manipulation}
+#btnrecall[disabled]{opacity:.28}
+#btnrecall.armed{border-color:var(--us);color:var(--us)}
 
-#mapwrap{height:32%;flex:none;padding:6px}
+#mapwrap{height:30%;flex:none;padding:6px}
 #map{width:100%;height:100%;display:block;image-rendering:pixelated;touch-action:none}
-#trendwrap{height:8%;flex:none;padding:5px 6px}
-#trend{width:100%;height:100%;display:block}
 
 /* ticker: IMPORTANT events only */
 #ticker{flex:none;border:1px solid var(--amber);background:var(--bg);
@@ -47,62 +52,49 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 @keyframes tk{to{transform:translateX(-50%)}}
 #tickin .up{color:var(--us)} #tickin .bad{color:var(--foe)} #tickin .rq{color:var(--amber)}
 #tickin .sep{color:var(--line);padding:0 8px}
-/* overview: everything else, two lines, steps up two at a time */
-#feed{flex:none;height:34px;overflow:hidden;border:1px solid var(--line);border-top:0;
-  background:var(--bg);padding:1px 8px;font-size:11px;line-height:16px}
-#feed div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--dim)}
-#feed .up{color:var(--us)} #feed .bad{color:var(--foe)} #feed .rq{color:var(--amber)} #feed .team{color:var(--ink)}
+/* mid row: ticker A-D (slot informatics, left) + OP-MONITOR (right) */
+#midrow{flex:1.1;min-height:0;display:flex;gap:8px}
+#tickers{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}
+.tk{flex:1;border:1px solid var(--line);background:var(--panel);padding:3px 8px;
+  font-size:10px;color:var(--dim);display:flex;align-items:center;gap:6px;
+  white-space:nowrap;overflow:hidden;min-height:0}
+.tk b{color:var(--ink);font-weight:400}
+.tk .slot{color:var(--dim);border:1px solid var(--line);padding:0 5px;flex:none;font-size:9px}
+.tk.hot{border-color:var(--amber)} .tk.hot b{color:var(--amber)}
+.tk.up{border-color:var(--us)} .tk.up b{color:var(--us)}
+#monwrap{width:45%;flex:none;padding:6px}
+#forces{width:100%;height:100%;display:block;background:var(--bg);image-rendering:pixelated}
 
-#deck{flex:1;min-height:0;margin-top:5px;padding:6px 8px 8px;display:flex;flex-direction:column;gap:6px;overflow:hidden}
-/* deck header is its own in-flow segment — never overlapped by the cue banner */
-#deck>.ph{position:static;transform:none;flex:none;display:block;background:transparent;
-  padding:0 0 3px;border-bottom:1px solid var(--line)}
-#reqbar{border:1px solid var(--amber);padding:4px 8px;display:none;flex:none}
-#reqbar.on{display:block}
-#reqbar .t{color:var(--amber);font-size:11px}
-#reqwin{height:5px;background:var(--bg);margin-top:3px}
-#reqwin i{display:block;height:100%;background:var(--amber);width:100%}
-#deckmain{flex:1;display:flex;gap:8px;min-height:0;overflow:hidden}
-/* left: two text tiles + the forces pictogram */
-#leftcol{width:42%;flex:none;display:flex;flex-direction:column;gap:4px;min-height:0}
-#tiles{display:grid;grid-template-columns:1fr 1fr;gap:4px}
-.stat{border:1px solid var(--line);padding:3px 7px;background:var(--bg);
-  display:flex;justify-content:space-between;align-items:baseline}
-.stat .k{color:var(--dim);font-size:9px;letter-spacing:.1em}
-.stat .v{font-size:13px;font-variant-numeric:tabular-nums}
-.stat.low .v{color:var(--foe)}
-#forces{flex:1;width:100%;border:1px solid var(--line);background:var(--bg);
-  image-rendering:pixelated;min-height:0}
-#squads{flex:1;display:flex;flex-direction:column;gap:4px;min-width:0;min-height:0;overflow:hidden}
+/* stat rows: panel left, two action tiles right */
+.strow{flex:1;min-height:0;display:flex;gap:8px}
+.strow .panel{flex:1;min-width:0;padding:12px 8px 6px;overflow:hidden}
+.tile{width:24%;flex:none;background:var(--panel);border:1px solid var(--line);color:var(--ink);
+  font-family:var(--mono);font-size:11px;letter-spacing:.04em;padding:6px;
+  display:flex;flex-direction:column;justify-content:space-between;align-items:flex-start;
+  text-align:left;touch-action:manipulation;overflow:hidden}
+.tile .k{font-size:9px;color:var(--dim);letter-spacing:.14em}
+.tile .cost{font-size:9px;color:var(--dim);white-space:nowrap}
+.tile:active{background:var(--ink);color:var(--bg)}
+.tile[disabled]{opacity:.28}
+.tile.armed{border-color:var(--us);color:var(--us)}
+.tile.hot{border-color:var(--amber);color:var(--amber)}
+.tile.togon{border-color:var(--us);color:var(--us)}
+
+#squads{display:flex;flex-direction:column;gap:4px;min-width:0;height:100%;overflow:hidden}
 .sq{border:1px solid var(--line);background:var(--bg);padding:3px 7px;
   display:grid;grid-template-columns:auto 1fr auto;gap:7px;align-items:baseline}
-.sq .nm{white-space:nowrap}
+.sq .nm{white-space:nowrap;font-size:11px;letter-spacing:.06em}
 .sq.mine{border-color:var(--us)}
-.sq .nm{font-size:11px;letter-spacing:.06em}
 .sq.mine .nm{color:var(--us)}
 .sq .st{font-size:10px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sq .hp{font-size:10px;letter-spacing:.1em;white-space:nowrap}
+.sq .hp{font-size:10px;white-space:nowrap}
 .sq .hp svg{margin-left:2px}
 #hostiles{font-size:10px;color:var(--foe);letter-spacing:.06em;padding:1px 2px}
-/* war ledger: fills the idle space with the macro story */
-#ledger{margin-top:auto;border:1px solid var(--line);background:var(--bg);
-  padding:3px 8px;font-size:10px;color:var(--dim);line-height:1.45}
+/* voxel stats: the macro story */
+#ledger{font-size:10px;color:var(--dim);line-height:1.5;height:100%;overflow:hidden}
 #ledger b{color:var(--ink);font-weight:400}
 #ledger .up{color:var(--us)} #ledger .bad{color:var(--foe)}
 #ledger .lrow{display:flex;justify-content:space-between}
-
-/* actions: stacked vertically, press-arm-confirm */
-#actions{display:flex;flex-direction:column;gap:5px;flex:none}
-#actions button{padding:7px 12px;font-family:var(--mono);font-size:12px;letter-spacing:.05em;
-  background:var(--bg);border:1px solid var(--line);color:var(--ink);text-align:left;
-  display:flex;justify-content:space-between;
-  touch-action:manipulation;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#actions button .cost{color:var(--dim);font-size:10px}
-#actions button:active{background:var(--ink);color:var(--bg)}
-#actions button[disabled]{opacity:.28}
-#actions button.armed{border-color:var(--us);color:var(--us)}
-#actions button.hot{border-color:var(--amber);color:var(--amber)}
-#actions button.togon{border-color:var(--us);color:var(--us)}
 
 #debrief{position:absolute;inset:0;background:rgba(23,23,27,.97);display:none;
   flex-direction:column;padding:40px 24px;gap:10px;z-index:5}
@@ -116,26 +108,30 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 </head>
 <body>
 <main id="device">
-  <div id="topbar"><span id="bclock">180</span><span id="phase">THEATRE 7 // LIVE</span>
-    <button id="btnpause">⏸</button><span id="tidepct">TIDE —</span></div>
+  <div id="toprow">
+    <div id="trendwrap" class="panel"><span class="ph">TIDE</span><canvas id="trend"></canvas></div>
+    <div id="ctrl" class="panel"><span class="ph">CONTROLS</span>
+      <div id="ctrlrow"><span id="bclock">180</span><span id="tidepct">TIDE —</span></div>
+      <div id="ctrlrow"><button id="btnpause">⏸</button><button id="btnrecall">RECALL</button></div>
+    </div>
+  </div>
   <div id="mapwrap" class="panel"><span class="ph">THEATRE — tap to designate 141's objective</span><canvas id="map"></canvas></div>
-  <div id="trendwrap" class="panel"><span class="ph">TIDE</span><canvas id="trend"></canvas></div>
   <div id="ticker"><div id="tickin"></div></div>
-  <div id="feed"></div>
-  <section id="deck" class="panel"><span class="ph">OPERATIONS</span>
-    <div id="reqbar"><span class="t" id="reqtxt"></span><div id="reqwin"><i></i></div></div>
-    <div id="deckmain">
-      <div id="leftcol">
-        <div id="tiles"></div>
-        <canvas id="forces"></canvas>
-      </div>
-      <div id="squads"></div>
+  <div id="midrow">
+    <div id="tickers">
+      <div class="tk" id="tkA"></div><div class="tk" id="tkB"></div>
+      <div class="tk" id="tkC"></div><div class="tk" id="tkD"></div>
     </div>
-    <div id="actions">
-      <button id="b0"></button><button id="b1"></button><button id="b2"></button>
-      <button id="b3"></button><button id="b4"></button>
-    </div>
-  </section>
+    <div id="monwrap" class="panel"><span class="ph">OP-MONITOR</span><canvas id="forces"></canvas></div>
+  </div>
+  <div class="strow">
+    <div class="panel"><span class="ph">OP STATS</span><div id="squads"></div></div>
+    <button class="tile" id="bA"></button><button class="tile" id="bB"></button>
+  </div>
+  <div class="strow">
+    <div class="panel"><span class="ph">VOXEL STATS</span><div id="ledger"></div></div>
+    <button class="tile" id="bC"></button><button class="tile" id="bD"></button>
+  </div>
   <div id="debrief"><h2 id="verdict">—</h2><div id="receipts"></div><button id="again">RE-RUN THEATRE</button></div>
 </main>
 
@@ -186,7 +182,7 @@ function reset(){
     var i=y*GW+x; if (S.terr[i]) continue;
     S.c[i] = x<4 ? 0.95 : x>=GW-4 ? -0.95 : 0;
   }
-  ticks.length=0; feedBuf.length=0;
+  ticks.length=0;
   tick("THEATRE 7 OPEN — lines advancing on both sides",'up',true);
   tick("141 is yours. tap the map to designate their objective",'rq',true);
 }
@@ -622,7 +618,7 @@ function renderTrend(){
 }
 
 /* ============ ticker (important) + two-line stepping overview ============ */
-var ticks=[], feedBuf=[], feedPend=[];
+var ticks=[];
 function tick(m,cls,important){
   if (important){
     ticks.unshift({m:m,cls:cls||""}); if (ticks.length>6) ticks.pop();
@@ -635,15 +631,6 @@ function tick(m,cls,important){
     var chars=ticks.reduce(function(a,t2){return a+t2.m.length+3;},0);
     el.style.animationDuration=Math.max(14,chars*0.35)+"s";
   }
-  feedPend.push({m:m,cls:cls||""});
-  if (feedPend.length>=2) flushFeed();          // steps up two lines at a time
-}
-var feedFlushT=0;
-function flushFeed(){
-  while (feedPend.length){ feedBuf.unshift(feedPend.shift()); }
-  if (feedBuf.length>2) feedBuf.length=2;
-  document.getElementById("feed").innerHTML=feedBuf.map(function(f2){
-    return '<div class="'+f2.cls+'">'+f2.m+'</div>'; }).join("");
 }
 
 /* ============ pixel-people force readout ============ */
@@ -762,13 +749,34 @@ function doll(m,player){
     +'<rect x="3" y="9.5" width="1.4" height="3" fill="none" stroke="'+col+'"/>'
     +'<rect x="6.6" y="9.5" width="1.4" height="3" fill="none" stroke="'+col+'"/></svg>';
 }
+/* ticker A-D: each slot's informatics — what pressing its tile would DO right now */
+function renderTickers(){
+  var q=me();
+  var A=document.getElementById("tkA");
+  if (S.cue){ A.className="tk hot";
+    A.innerHTML='<span class="slot">A</span><b>'+S.cue.verb+'</b> '+S.cue.cost+' · '+Math.ceil(S.cue.left)+'s';
+  } else { A.className="tk";
+    A.innerHTML='<span class="slot">A</span>no operative request pending'; }
+  var B=document.getElementById("tkB");
+  B.className=q.urge?"tk up":"tk";
+  B.innerHTML='<span class="slot">B</span><b>141 '+(q.urge?"URGED":"steady")+'</b> · '
+    +(q.phase==="WORK"?q.op.name+" "+(q.prog|0)+"%":q.phase.toLowerCase());
+  var C=document.getElementById("tkC");
+  var ck = S.mat>=3?'<b>ORBITAL LANCE</b> keyed · 3 MAT'
+         : S.mat>=1?'<b>TOMAHAWK</b> keyed · 1 MAT'
+         : 'no strike keys — espionage/uplink earns MAT';
+  C.className=S.mat>=1?"tk up":"tk";
+  C.innerHTML='<span class="slot">C</span>'+ck;
+  var D=document.getElementById("tkD");
+  var mk = S.mechaUnit?'<b>MECHA fielded</b> — holding ground'
+         : S.mechaCd>0?'mecha cooling '+(S.mechaCd|0)+'s'
+         : S.req>=250?'<b>MECHA DROP</b> ready · 250 req':'mecha ready — need 250 req ('+(S.req|0)+')';
+  D.className=(!S.mechaUnit&&S.mechaCd<=0&&S.req>=250)?"tk up":"tk";
+  D.innerHTML='<span class="slot">D</span>'+mk;
+}
 function renderDeck(){
-  var st=[["TIDE",(S.tide>=0?"+":"")+(S.tide*100|0)+"%",S.tide<0],
-          ["REQ",S.req|0,S.req<80]];
-  document.getElementById("tiles").innerHTML=st.map(function(s2){
-    return '<div class="stat'+(s2[2]?" low":"")+'"><span class="k">'+s2[0]+'</span><span class="v">'+s2[1]+'</span></div>';
-  }).join("");
   drawForces();
+  renderTickers();
   var blu=S.squads.filter(function(q){return q.side>0;});
   var hos=S.squads.filter(function(q){return q.side<0 && q.phase!=="DOWN";}).length;
   document.getElementById("squads").innerHTML = blu.map(function(q){
@@ -778,27 +786,19 @@ function renderDeck(){
           : q.phase;
     return '<div class="sq'+(q.player?" mine":"")+'"><span class="nm">'+q.name+'</span>'
       +'<span class="st">'+st2+'</span><span class="hp">'+pips+'</span></div>';
-  }).join("") + '<div id="hostiles">HOSTILE NET: '+hos+' active cell'+(hos===1?"":"s")+'</div>'
-  // the war ledger: macro story in the idle space
-  + (function(){
-      var held=0,lost=0;
-      for (var i=0;i<N;i+=5){ if (S.terr[i]) continue;
-        if (S.c[i]>0.5) held++; else if (S.c[i]<-0.5) lost++; }
-      var tot=held+lost||1;
-      var lastOp=S.receipts.length?S.receipts[S.receipts.length-1]:"no operations logged yet";
-      return '<div id="ledger">'
-        +'<div class="lrow"><span>GROUND</span><span><b class="up">'+Math.round(held/tot*100)+'%</b> / <b class="bad">'+Math.round(lost/tot*100)+'%</b></span></div>'
-        +'<div class="lrow"><span>LINE KIA</span><span><b class="up">'+S.kiaB+'</b> / <b class="bad">'+S.kiaO+'</b></span></div>'
-        +'<div class="lrow"><span>OPS DONE</span><span><b>'+S.opsDone+'</b></span></div>'
-        +'<div class="lrow"><span>ELAPSED</span><span><b>'+(180-S.t|0)+'s</b></span></div>'
-        +'<div style="margin-top:2px;border-top:1px dashed var(--line);padding-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+lastOp+'</div>'
-        +'</div>';
-    })();
-  var rb=document.getElementById("reqbar");
-  if (S.cue){ rb.classList.add("on");
-    document.getElementById("reqtxt").textContent="141 REQUESTS "+S.cue.verb+" — "+S.cue.cost;
-    rb.querySelector("#reqwin i").style.width=(S.cue.left/S.cue.dur*100)+"%";
-  } else rb.classList.remove("on");
+  }).join("") + '<div id="hostiles">HOSTILE NET: '+hos+' active cell'+(hos===1?"":"s")+'</div>';
+  // voxel stats: macro story
+  var held=0,lost=0;
+  for (var i=0;i<N;i+=5){ if (S.terr[i]) continue;
+    if (S.c[i]>0.5) held++; else if (S.c[i]<-0.5) lost++; }
+  var tot=held+lost||1;
+  var lastOp=S.receipts.length?S.receipts[S.receipts.length-1]:"no operations logged yet";
+  document.getElementById("ledger").innerHTML=
+    '<div class="lrow"><span>REQ / CAS / MAT</span><span><b>'+(S.req|0)+'</b> / <b>'+S.cas+'</b> / <b>'+S.mat+'</b></span></div>'
+    +'<div class="lrow"><span>GROUND</span><span><b class="up">'+Math.round(held/tot*100)+'%</b> / <b class="bad">'+Math.round(lost/tot*100)+'%</b></span></div>'
+    +'<div class="lrow"><span>LINE KIA</span><span><b class="up">'+S.kiaB+'</b> / <b class="bad">'+S.kiaO+'</b></span></div>'
+    +'<div class="lrow"><span>OPS DONE</span><span><b>'+S.opsDone+'</b> · ELAPSED <b>'+(180-S.t|0)+'s</b></span></div>'
+    +'<div style="margin-top:2px;border-top:1px dashed var(--line);padding-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+lastOp+'</div>';
   document.getElementById("bclock").textContent=Math.max(0,S.t).toFixed(0);
   var tp=document.getElementById("tidepct");
   tp.textContent="TIDE "+(S.tide>=0?"+":"")+(S.tide*100).toFixed(0)+"%";
@@ -806,41 +806,47 @@ function renderDeck(){
   renderButtons();
 }
 
-/* ============ actions: vertical stack, press-arm-confirm ============ */
+/* ============ action tiles A-D + recall: press-arm-confirm ============ */
 function me(){ return S.squads[0]; }
+/* slot letter is the tile's identity; ticker row of the same letter is its informatics */
 var BTN=[
-  { label:function(){ return S.cue ? "✓ "+S.cue.verb : "— NO REQUEST —"; },
+  { slot:"A", label:function(){ return S.cue ? "APPROVE" : "NO REQ"; },
     cost:function(){ return S.cue?S.cue.cost:""; },
     hot:function(){ return !!S.cue; }, can:function(){ return !!S.cue; },
     fire:function(){ var c2=S.cue; S.cue=null; c2.yes(c2.sq); } },
-  { label:function(){ return me().urge?"URGING 141 ▮":"URGE 141"; }, cost:function(){return "toggle";},
+  { slot:"B", label:function(){ return me().urge?"URGING ▮":"URGE 141"; }, cost:function(){return "toggle";},
     tog:function(){ return me().urge; }, can:function(){ return me().hp>0; },
     fire:function(){ me().urge=!me().urge;
       tick(me().urge?"you: push. 141: pushing":"you: steady. 141: copy","team"); } },
-  { label:function(){ return S.mechaUnit?"MECHA FIELDED":"MECHA DROP"; },
-    cost:function(){ return S.mechaCd>0?"cooling "+(S.mechaCd|0)+"s":"−250 req · LAOE clear"; },
-    can:function(){ return !S.mechaUnit && S.mechaCd<=0 && S.req>=250; },
-    fire:function(){ if (fireLAOE("MECHA")){ S.req-=250; S.mechaCd=45; } } },
-  { label:function(){ return S.mat>=3?"ORBITAL LANCE":"TOMAHAWK"; },
-    cost:function(){ return S.mat>=3?"−3 MAT · vast LAOE":S.mat>=1?"−1 MAT · large LAOE":"needs MAT (espionage/uplink)"; },
+  { slot:"C", label:function(){ return S.mat>=3?"ORBITAL":"TOMAHAWK"; },
+    cost:function(){ return S.mat>=3?"−3 MAT":S.mat>=1?"−1 MAT":"needs MAT"; },
     can:function(){ return S.mat>=1; },
     fire:function(){ if (S.mat>=3){ if (fireLAOE("ORBITAL")) S.mat-=3; }
                      else { if (fireLAOE("TOMAHAWK")) S.mat-=1; } } },
-  { label:function(){ return "RECALL 141"; }, cost:function(){ return "abort op"; },
+  { slot:"D", label:function(){ return S.mechaUnit?"FIELDED":"MECHA"; },
+    cost:function(){ return S.mechaCd>0?"cool "+(S.mechaCd|0)+"s":"−250 req"; },
+    can:function(){ return !S.mechaUnit && S.mechaCd<=0 && S.req>=250; },
+    fire:function(){ if (fireLAOE("MECHA")){ S.req-=250; S.mechaCd=45; } } },
+  { slot:"", label:function(){ return "RECALL"; }, cost:function(){ return ""; },
     can:function(){ return me().phase==="INSERT"||me().phase==="WORK"; },
     fire:function(){ me().phase="EXFIL"; S.cue=null; tick("you: abort. 141 exfiltrating","team"); } },
 ];
+var BTN_IDS=["bA","bB","bC","bD","btnrecall"];
 function renderButtons(){
   for (var k=0;k<5;k++){
-    var b=document.getElementById("b"+k), d=BTN[k];
+    var b=document.getElementById(BTN_IDS[k]), d=BTN[k];
     var armed=S.arm[k]>0;
-    b.innerHTML = armed ? "<span>CONFIRM ▸</span><span class='cost'>tap again</span>"
-                        : "<span>"+d.label()+"</span><span class='cost'>"+d.cost()+"</span>";
+    if (k<4){
+      b.innerHTML = armed ? '<span class="k">'+d.slot+'</span><span>CONFIRM ▸</span><span class="cost">tap again</span>'
+                          : '<span class="k">'+d.slot+'</span><span>'+d.label()+'</span><span class="cost">'+d.cost()+'</span>';
+    } else {
+      b.textContent = armed ? "SURE?" : "RECALL";
+    }
     b.disabled = !d.can() || S.over;
-    b.className = armed?"armed" : (d.hot&&d.hot()?"hot" : (d.tog&&d.tog()?"togon":""));
+    b.className = (k<4?"tile ":"") + (armed?"armed" : (d.hot&&d.hot()?"hot" : (d.tog&&d.tog()?"togon":"")));
   }
 }
-["b0","b1","b2","b3","b4"].forEach(function(id,k){
+BTN_IDS.forEach(function(id,k){
   document.getElementById(id).addEventListener("click",function(){
     if (!BTN[k].can()||S.over) return;
     if (S.arm[k]>0){ S.arm[k]=0; BTN[k].fire(); renderDeck(); }
@@ -857,7 +863,6 @@ mapC.addEventListener("pointerdown",function(e){
 document.getElementById("btnpause").addEventListener("click",function(){
   S.paused=!S.paused;
   this.textContent=S.paused?"▶":"⏸"; this.classList.toggle("on",S.paused);
-  document.getElementById("phase").textContent=S.paused?"THEATRE 7 // PAUSED":"THEATRE 7 // LIVE";
 });
 document.getElementById("again").addEventListener("click",function(){
   document.getElementById("debrief").classList.remove("on"); reset();
@@ -868,7 +873,6 @@ var last=performance.now();
 function loop(now){
   var dt=Math.min(0.1,(now-last)/1000); last=now;
   advance(dt);
-  feedFlushT+=dt; if (feedFlushT>3){ feedFlushT=0; if (feedPend.length) flushFeed(); }
   for (var k=0;k<5;k++) if (S.arm[k]>0){ S.arm[k]-=dt; if (S.arm[k]<=0){S.arm[k]=0; renderButtons();} }
   renderMap(); renderTrend(); renderDeck();
   requestAnimationFrame(loop);
