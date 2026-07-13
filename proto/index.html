@@ -103,7 +103,8 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 .sq .st{font-size:10px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sq .hp{font-size:10px;white-space:nowrap}
 .sq .hp svg{margin-left:2px}
-#hostiles{font-size:10px;color:var(--foe);letter-spacing:.06em;padding:1px 2px}
+#alliedline{font-size:10px;color:var(--dim);letter-spacing:.04em;padding:3px 9px;margin-top:auto}
+#alliedline .ally b{color:var(--ink);font-weight:400}
 /* voxel stats: the macro story */
 #ledger{font-size:10px;color:var(--dim);line-height:1.5;overflow:hidden}
 #ledger b{color:var(--ink);font-weight:400}
@@ -887,32 +888,45 @@ function drawForces(){
     fctx.fillRect(x,y,u,u*3); fctx.fillRect(x-(u>>1),y+u*3,u*2,u); // body+fins
     fctx.fillStyle="#ffb63d"; fctx.fillRect(x,y-u,u,u);            // tip
   }
-  var pad=6*d, row=0, rowH=Math.max(14*d,(H-pad*2)/4);
+  var pad=6*d, rowH=Math.max(14*d,(H-pad*2)/4);
   function label(t,y){ fctx.fillStyle="#8a8778"; fctx.font=(8*d)+"px monospace";
     fctx.textAlign="left"; fctx.textBaseline="top"; fctx.fillText(t,pad,y); }
-  // row 0: allied line strength (1 glyph ≈ 12 troops alive)
+  function count(n,y){ fctx.fillStyle="#e8e4d8"; fctx.font=(8*d)+"px monospace";
+    fctx.textAlign="right"; fctx.textBaseline="top"; fctx.fillText(String(n),W-pad,y); }
+  function divider(y){ fctx.strokeStyle="#292930"; fctx.lineWidth=Math.max(1,d);
+    fctx.beginPath(); fctx.moveTo(pad,y); fctx.lineTo(W-pad,y); fctx.stroke(); }
+  var yMid=rowH/2+2*d;               // shared vertical center for glyphs within a row
+  // row 0: allied line strength (1 glyph ≈ 12 troops alive; number is the real count)
   var blu=0,opf=0;
   S.troops.forEach(function(t2){ if (t2.dead<=0){ if (t2.side>0) blu++; else opf++; } });
-  var y0=pad; label("LINE",y0);
-  for (var k=0;k<Math.min(10,Math.round(blu/12));k++) person(pad+34*d+k*u*3.2,y0+2*d,"#d8ff3d");
+  var y0=pad; label("LINE",y0); count(blu,y0);
+  for (var k=0;k<Math.min(10,Math.round(blu/12));k++) person(pad+34*d+k*u*3.2,y0+yMid-u,"#d8ff3d");
+  divider(pad+rowH-4*d);
   // row 1: hostile line
-  var y1=pad+rowH; label("HOSTL",y1);
-  for (var k2=0;k2<Math.min(10,Math.round(opf/12));k2++) person(pad+34*d+k2*u*3.2,y1+2*d,"#ff5a2a");
+  var y1=pad+rowH; label("HOSTL",y1); count(opf,y1);
+  for (var k2=0;k2<Math.min(10,Math.round(opf/12));k2++) person(pad+34*d+k2*u*3.2,y1+yMid-u,"#ff5a2a");
+  divider(pad+rowH*2-4*d);
   // row 2: operators (141 = white, allies = acid)
   var y2=pad+rowH*2; label("OPS",y2);
+  var opsAlive=S.squads.reduce(function(a,sq){return a+(sq.side>0?sq.hp:0);},0);
+  count(opsAlive,y2);
   var ox=pad+34*d;
   S.squads.forEach(function(sq){
     if (sq.side<0) return;
-    for (var h=0;h<sq.hp;h++){ person(ox,y2+2*d, sq.player?"#e8e4d8":"#d8ff3d"); ox+=u*3.2; }
+    for (var h=0;h<sq.hp;h++){ person(ox,y2+yMid-u, sq.player?"#e8e4d8":"#d8ff3d"); ox+=u*3.2; }
     ox+=u*2;
   });
-  // row 3: kinetics — mecha readiness + strike materiel
+  divider(pad+rowH*3-4*d);
+  // row 3: kinetics — mecha readiness + strike materiel, same baseline as the row above
   var y3=pad+rowH*3; label("KIN",y3);
+  var ky=y3+yMid;
   var kx=pad+34*d;
-  if (S.mechaCd<=0 && !S.mechaUnit){ mecha(kx,y3+3*d,"#e8e4d8"); kx+=u*5; }
-  if (S.mechaUnit){ mecha(kx,y3+3*d,"#d8ff3d"); kx+=u*5; }
-  for (var mm=0;mm<Math.min(6,S.mat);mm++){ missile(kx,y3+2*d,"#e8e4d8"); kx+=u*3; }
-  for (var cc=0;cc<S.cas;cc++){ missile(kx,y3+2*d,"#8a8778"); kx+=u*3; }
+  if (S.mechaCd<=0 && !S.mechaUnit){ mecha(kx,ky-u,"#e8e4d8"); kx+=u*5; }
+  if (S.mechaUnit){ mecha(kx,ky-u,"#d8ff3d"); kx+=u*5; }
+  for (var mm=0;mm<Math.min(6,S.mat);mm++){ missile(kx,ky-u,"#e8e4d8"); kx+=u*3; }
+  for (var cc=0;cc<S.cas;cc++){ missile(kx,ky-u,"#8a8778"); kx+=u*3; }
+  fctx.fillStyle="#8a8778"; fctx.font=(7*d)+"px monospace"; fctx.textAlign="right"; fctx.textBaseline="top";
+  fctx.fillText("MAT "+S.mat+" · CAS "+S.cas,W-pad,y3);
 }
 
 /* one operative = one doll — only for the squad the player actually runs.
@@ -980,20 +994,17 @@ function renderDeck(){
   renderTickers();
   var blu=S.squads.filter(function(q){return q.side>0;});
   var hos=S.squads.filter(function(q){return q.side<0 && q.phase!=="DOWN";}).length;
-  document.getElementById("squads").innerHTML = blu.map(function(q){
-    var st2=q.phase==="WORK" ? q.op.name+" "+(q.prog|0)+"%"
-          : q.phase==="INSERT" ? "→ "+q.op.name
-          : q.phase;
-    if (q.player){                                  // your team: full squad-focus roster
-      var head='<div class="sq mine sqhead"><span class="nm">'+q.name+'</span>'
-        +'<span class="st">'+st2+'</span></div>';
-      var rows=q.crew.map(function(m){ return oprow(m); }).join("");
-      return head+rows;
-    }
+  var me2=blu.filter(function(q){return q.player;})[0];
+  var mineHtml = '<div class="sq mine sqhead"><span class="nm">'+me2.name+'</span>'
+    +'<span class="st">'+(me2.phase==="WORK"?me2.op.name+" "+(me2.prog|0)+"%":
+       me2.phase==="INSERT"?"→ "+me2.op.name:me2.phase)+'</span></div>'
+    +me2.crew.map(function(m){ return oprow(m); }).join("");
+  var alliedHtml = blu.filter(function(q){return !q.player;}).map(function(q){
     var alive=q.crew.filter(function(m){return m.st==="OK";}).length;
-    return '<div class="sq"><span class="nm">'+q.name+'</span>'
-      +'<span class="st">'+st2+'</span><span class="hp">'+alive+'/4</span></div>';
-  }).join("") + '<div id="hostiles">HOSTILE NET: '+hos+' active cell'+(hos===1?"":"s")+'</div>';
+    return '<span class="ally">'+q.name+' <b>'+alive+'/4</b></span>';
+  }).join(" · ");
+  document.getElementById("squads").innerHTML = mineHtml
+    +'<div id="alliedline">'+alliedHtml+'</div>';
   // voxel stats: macro story
   var held=0,lost=0;
   for (var i=0;i<N;i+=5){ if (S.terr[i]) continue;
@@ -1005,6 +1016,7 @@ function renderDeck(){
     +'<div class="lrow"><span>GROUND</span><span><b class="up">'+Math.round(held/tot*100)+'%</b> / <b class="bad">'+Math.round(lost/tot*100)+'%</b></span></div>'
     +'<div class="lrow"><span>LINE KIA</span><span><b class="up">'+S.kiaB+'</b> / <b class="bad">'+S.kiaO+'</b></span></div>'
     +'<div class="lrow"><span>OPS DONE</span><span><b>'+S.opsDone+'</b> · ELAPSED <b>'+(180-S.t|0)+'s</b></span></div>'
+    +'<div class="lrow"><span>HOSTILE NET</span><span><b class="bad">'+hos+'</b> active cell'+(hos===1?"":"s")+'</span></div>'
     +'<div style="margin-top:2px;border-top:1px dashed var(--line);padding-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+lastOp+'</div>';
   document.getElementById("bclock").textContent=Math.max(0,S.t).toFixed(0);
   var tp=document.getElementById("tidepct");
