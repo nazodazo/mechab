@@ -88,8 +88,9 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 .sq{border:1px solid var(--line);background:var(--bg);padding:4px 9px;border-radius:8px;
   display:grid;grid-template-columns:auto 1fr auto;gap:7px;align-items:baseline}
 .sq .nm{white-space:nowrap;font-size:11px;letter-spacing:.06em}
-.sq.mine{border-color:var(--us)}
+.sq.mine{border-color:var(--us);padding:6px 9px}
 .sq.mine .nm{color:var(--us)}
+.sq.mine .hp svg{margin-left:3px}
 .sq .st{font-size:10px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sq .hp{font-size:10px;white-space:nowrap}
 .sq .hp svg{margin-left:2px}
@@ -232,8 +233,9 @@ function caStep(){
     var l=x>0&&!S.terr[i-1]?S.c[i-1]:S.c[i], r=x<GW-1&&!S.terr[i+1]?S.c[i+1]:S.c[i];
     var u=y>0&&!S.terr[i-GW]?S.c[i-GW]:S.c[i], d=y<GH-1&&!S.terr[i+GW]?S.c[i+GW]:S.c[i];
     var avg=(l+r+u+d)/4;
-    var v=S.c[i] + 0.13*(avg-S.c[i]) + (Math.random()-0.5)*0.014;
-    if (Math.abs(v)<0.55) v-=v*0.04;
+    var slope=1-S.h[i]*0.55;                 // control spreads slowly uphill —
+    var v=S.c[i] + 0.13*slope*(avg-S.c[i]) + (Math.random()-0.5)*0.014;
+    if (Math.abs(v)<0.55) v-=v*(0.04+S.h[i]*0.05);   // — and fronts stall on the high ground
     if (x<3) v=Math.max(v,0.9); if (x>=GW-3) v=Math.min(v,-0.9);
     S.c[i]=v>1?1:v<-1?-1:v;
   }
@@ -303,12 +305,12 @@ function troopTick(tr,dt){
   var i=(tr.y|0)*GW+(tr.x|0);
   var here=(i>=0&&i<N)?S.c[i]:0;
   var owned=here*tr.side;
-  var slope=1-(S.h[i]||0)*0.55;                      // high ground is slow ground
+  var slope=1-(S.h[i]||0)*0.7;                       // high ground is slow ground
   if (owned>0.35){                                   // rear area: march to the front
     tr.jig+=dt*3;
     tr.x+=tr.side*dt*(4+Math.sin(tr.jig))*slope; tr.y+=Math.cos(tr.jig*0.7)*dt*2.5*slope;
   } else {                                           // at the front: fight for the cell
-    if (!S.terr[i]&&i>=0&&i<N) S.c[i]=Math.max(-1,Math.min(1,S.c[i]+tr.side*dt*0.55));
+    if (!S.terr[i]&&i>=0&&i<N) S.c[i]=Math.max(-1,Math.min(1,S.c[i]+tr.side*dt*0.55*slope));
     tr.x+=tr.side*dt*0.7*slope; tr.y+=(Math.random()-0.5)*dt*3;
     var danger=Math.max(0,-here*tr.side);
     if (Math.random()<dt*(0.02+danger*0.10)){ tr.dead=3+Math.random()*4;  // fall, respawn
@@ -543,6 +545,9 @@ function renderMap(){
     if (v>0.05){ var g=0.2+v*0.62; px[o]=216*g; px[o+1]=255*g; px[o+2]=61*g; }
     else if (v<-0.05){ var f=0.2-v*0.62; px[o]=255*f; px[o+1]=90*f; px[o+2]=42*f; }
     else { px[o]=32;px[o+1]=33;px[o+2]=38; }
+    // hillshade: high ground bright, craters read as dark pits
+    var hs=0.62+S.h[i]*0.75;
+    px[o]*=hs; px[o+1]*=hs; px[o+2]*=hs;
     // topographic contours: faint line wherever the elevation band steps
     var x2=i%GW, lvl=(S.h[i]*3)|0;
     if ((x2<GW-1 && ((S.h[i+1]*3)|0)!==lvl) || (i<N-GW && ((S.h[i+GW]*3)|0)!==lvl)){
@@ -700,66 +705,134 @@ function tick(m,cls,important){
 
 /* ============ pixel-people force readout ============ */
 /* OP-MONITOR: when an action fires, this canvas becomes the action —
-   micro press translating into a macro event, drawn in the action's own idiom. */
+   micro press translating into a macro event, drawn in the action's own idiom.
+   Every scene has three layers: the moving element, live telemetry numbers,
+   and a stage checklist that fills in as the event progresses. */
+function monChecklist(stages,p,W,H,d){
+  var n=stages.length;
+  fctx.font=(7*d)+"px monospace"; fctx.textAlign="left"; fctx.textBaseline="top";
+  for (var k=0;k<n;k++){
+    var done=p>=(k+0.7)/n, now=!done&&p>=k/n;
+    fctx.fillStyle=done?"#d8ff3d":now?"#ffb63d":"#4a4a54";
+    fctx.fillText((done?"■ ":now?"▸ ":"□ ")+stages[k],6*d,H-((n-k)*9+4)*d);
+  }
+}
+function monTele(lines,W,d){
+  fctx.font=(7*d)+"px monospace"; fctx.textAlign="right"; fctx.textBaseline="top";
+  for (var k=0;k<lines.length;k++){
+    fctx.fillStyle="#8a8778"; fctx.fillText(lines[k],W-6*d,(15+k*9)*d);
+  }
+}
 function drawMonitor(){
   var W=fcC.width, H=fcC.height, d=window.devicePixelRatio||1;
-  var m=S.mon, p=Math.min(1,m.t/m.dur);
+  var m=S.mon, p=Math.min(1,m.t/m.dur), now=performance.now()/1000;
   fctx.clearRect(0,0,W,H);
   fctx.font=(8*d)+"px monospace"; fctx.textBaseline="top";
-  fctx.fillStyle="#8a8778"; fctx.textAlign="left";
-  fctx.fillText("OP-MONITOR // "+m.label,6*d,5*d);
+  fctx.fillStyle="#e8e4d8"; fctx.textAlign="left";
+  fctx.fillText("▮ "+m.label,6*d,4*d);
   var pad=10*d;
   if (m.kind==="KIN"){
-    // launch arc: pad bottom-left → apex → target bottom-right, staged like a flight plan
-    var x0=pad, y0=H-pad, x1=W-pad, y1=H-pad*1.4, cxq=W*0.42, cyq=pad*1.6;
-    fctx.strokeStyle="#34343c"; fctx.setLineDash([3*d,3*d]);
+    var x0=pad, y0=H-pad*3.2, x1=W-pad*1.5, y1=H-pad*3.6, cxq=W*0.42, cyq=pad*1.8;
+    function bz(q){ return [(1-q)*(1-q)*x0+2*(1-q)*q*cxq+q*q*x1,
+                            (1-q)*(1-q)*y0+2*(1-q)*q*cyq+q*q*y1]; }
+    // flight-plan: dashed full path with waypoint ticks
+    fctx.strokeStyle="#34343c"; fctx.setLineDash([3*d,3*d]); fctx.lineWidth=Math.max(1,d);
     fctx.beginPath(); fctx.moveTo(x0,y0); fctx.quadraticCurveTo(cxq,cyq,x1,y1); fctx.stroke();
     fctx.setLineDash([]);
-    var tt=p, ix=(1-tt)*(1-tt)*x0+2*(1-tt)*tt*cxq+tt*tt*x1,
-             iy=(1-tt)*(1-tt)*y0+2*(1-tt)*tt*cyq+tt*tt*y1;
+    [0.25,0.5,0.75].forEach(function(q){ var pt=bz(q);
+      fctx.strokeStyle="#4a4a54";
+      fctx.beginPath(); fctx.moveTo(pt[0],pt[1]-3*d); fctx.lineTo(pt[0],pt[1]+3*d); fctx.stroke(); });
+    // flown portion: solid, with a fading exhaust trail behind the round
     fctx.strokeStyle="#e8e4d8"; fctx.lineWidth=Math.max(1,d);
-    fctx.beginPath(); fctx.moveTo(x0,y0);
-    for (var s4=0;s4<=20;s4++){ var q=s4/20*tt;
-      fctx.lineTo((1-q)*(1-q)*x0+2*(1-q)*q*cxq+q*q*x1,(1-q)*(1-q)*y0+2*(1-q)*q*cyq+q*q*y1); }
+    fctx.beginPath(); var pt0=bz(0); fctx.moveTo(pt0[0],pt0[1]);
+    for (var s4=1;s4<=24;s4++){ var pt=bz(s4/24*p); fctx.lineTo(pt[0],pt[1]); }
     fctx.stroke();
-    fctx.fillStyle="#ffb63d"; fctx.fillRect(ix-1.5*d,iy-1.5*d,3*d,3*d);
-    var stg = p<0.2?"LAUNCH": p<0.55?"ASCENT": p<0.85?"TERMINAL":"IMPACT";
-    fctx.fillStyle="#e8e4d8"; fctx.textAlign="right"; fctx.fillText(stg,W-6*d,5*d);
-    if (p>0.85){ fctx.strokeStyle="#ffb63d";
-      fctx.beginPath(); fctx.arc(x1,y1,(p-0.85)/0.15*12*d,0,Math.PI*2); fctx.stroke(); }
+    var ip=bz(p);
+    for (var e2=1;e2<=4;e2++){ var ep=bz(Math.max(0,p-e2*0.03));
+      fctx.fillStyle="rgba(255,182,61,"+(0.5-e2*0.1)+")";
+      fctx.fillRect(ep[0]-d,ep[1]-d,2*d,2*d); }
+    fctx.fillStyle="#ffb63d"; fctx.fillRect(ip[0]-2*d,ip[1]-2*d,4*d,4*d);
+    // launch pad + target box
+    fctx.strokeStyle="#8a8778"; fctx.strokeRect(x0-3*d,y0,6*d,3*d);
+    fctx.strokeStyle=p>0.85?"#ffb63d":"#4a4a54";
+    fctx.strokeRect(x1-4*d,y1-4*d,8*d,8*d);
+    if (p>0.85){ var bp=(p-0.85)/0.15;
+      fctx.strokeStyle="rgba(255,182,61,"+(1-bp)+")";
+      fctx.beginPath(); fctx.arc(x1,y1,bp*16*d,0,Math.PI*2); fctx.stroke();
+      fctx.beginPath(); fctx.arc(x1,y1,bp*9*d,0,Math.PI*2); fctx.stroke();
+      for (var db=0;db<6;db++){ var da=db/6*Math.PI*2+0.4;
+        fctx.fillStyle="rgba(232,228,216,"+(1-bp)+")";
+        fctx.fillRect(x1+Math.cos(da)*bp*13*d,y1+Math.sin(da)*bp*10*d,d,d); } }
+    monChecklist(["LAUNCH","ASCENT","TERMINAL","IMPACT"],p,W,H,d);
+    monTele(["ALT "+Math.max(0,Math.sin(p*Math.PI)*12000|0)+"m",
+             "VEL "+(680+p*240|0)+"m/s","TTI "+Math.max(0,m.dur-m.t).toFixed(1)+"s"],W,d);
   } else if (m.kind==="MECHA"){
-    // drop line: chassis descends the gauge, stages called on the way down
-    var dx=W*0.5, top=pad*2, bot=H-pad, my=top+(bot-top)*p;
+    var dx=W*0.42, top=pad*2.2, bot=H-pad*3.2, my=top+(bot-top)*p;
+    // altitude ladder on the right, marker descends it
+    var lx=W-pad*2;
+    fctx.strokeStyle="#34343c"; fctx.beginPath(); fctx.moveTo(lx,top); fctx.lineTo(lx,bot); fctx.stroke();
+    for (var t5=0;t5<=4;t5++){ var ty=top+(bot-top)*t5/4;
+      fctx.strokeStyle="#4a4a54";
+      fctx.beginPath(); fctx.moveTo(lx-3*d,ty); fctx.lineTo(lx+3*d,ty); fctx.stroke(); }
+    fctx.fillStyle="#ffb63d"; fctx.fillRect(lx-5*d,my-d,10*d,2*d);
+    // drop corridor + chassis
     fctx.strokeStyle="#34343c"; fctx.setLineDash([3*d,3*d]);
     fctx.beginPath(); fctx.moveTo(dx,top); fctx.lineTo(dx,bot); fctx.stroke(); fctx.setLineDash([]);
     fctx.strokeStyle="#d8ff3d"; fctx.lineWidth=Math.max(1,d);
-    fctx.strokeRect(dx-5*d,my-6*d,10*d,9*d);                     // hull
-    fctx.strokeRect(dx-2*d,my-9*d,4*d,3*d);                      // head
-    var stg2 = p<0.3?"DROP": p<0.65?"ENTRY": p<0.9?"RETRO":"GROUND";
-    fctx.fillStyle="#e8e4d8"; fctx.textAlign="right"; fctx.fillText(stg2,W-6*d,5*d);
-    if (p>0.9){ fctx.strokeStyle="#ffb63d";
-      fctx.beginPath(); fctx.arc(dx,bot,(p-0.9)/0.1*14*d,0,Math.PI,true); fctx.stroke(); }
-  } else { // CAS: pilot HUD, reticle converging on the mark
-    var cx2=W/2, cy2=H/2+3*d, rr=(1-p*0.55)*Math.min(W,H)*0.32;
+    fctx.strokeRect(dx-6*d,my-7*d,12*d,10*d);
+    fctx.strokeRect(dx-2.5*d,my-11*d,5*d,4*d);
+    fctx.beginPath(); fctx.moveTo(dx-6*d,my+3*d); fctx.lineTo(dx-8*d,my+7*d);
+    fctx.moveTo(dx+6*d,my+3*d); fctx.lineTo(dx+8*d,my+7*d); fctx.stroke();
+    if (p>0.55&&p<0.92){                            // retro burn
+      for (var f5=0;f5<3;f5++){ var fl=(4+Math.sin(now*30+f5*2)*2)*d;
+        fctx.strokeStyle="rgba(255,182,61,"+(0.9-f5*0.25)+")";
+        fctx.beginPath(); fctx.moveTo(dx-4*d+f5*4*d,my+3*d);
+        fctx.lineTo(dx-4*d+f5*4*d,my+3*d+fl); fctx.stroke(); } }
+    // ground line + dust on landing
+    fctx.strokeStyle="#8a8778"; fctx.beginPath(); fctx.moveTo(pad,bot+2*d); fctx.lineTo(W-pad,bot+2*d); fctx.stroke();
+    if (p>0.9){ var gp=(p-0.9)/0.1;
+      fctx.strokeStyle="rgba(232,228,216,"+(1-gp)+")";
+      fctx.beginPath(); fctx.arc(dx,bot+2*d,gp*16*d,Math.PI,Math.PI*2); fctx.stroke();
+      fctx.beginPath(); fctx.arc(dx,bot+2*d,gp*9*d,Math.PI,Math.PI*2); fctx.stroke(); }
+    monChecklist(["DROP","ENTRY","RETRO","GROUND"],p,W,H,d);
+    monTele(["ALT "+Math.max(0,(1-p)*8000|0)+"m","VVEL "+(p<0.55?420:p<0.92?140:0)+"m/s",
+             "HULL NOMINAL"],W,d);
+  } else { // CAS gun run: pilot HUD with horizon, converging reticle, tracers
+    var cx2=W*0.5, cy2=H*0.46, rr=(1-p*0.55)*Math.min(W,H)*0.30;
+    // artificial horizon: tilted line + pitch ladders
+    var tilt=Math.sin(now*0.9)*0.06;
+    fctx.save(); fctx.translate(cx2,cy2); fctx.rotate(tilt);
+    fctx.strokeStyle="#34343c";
+    fctx.beginPath(); fctx.moveTo(-W*0.4,0); fctx.lineTo(W*0.4,0); fctx.stroke();
+    [-1,1].forEach(function(sgn){
+      fctx.beginPath(); fctx.moveTo(-W*0.14,sgn*12*d); fctx.lineTo(-W*0.05,sgn*12*d);
+      fctx.moveTo(W*0.05,sgn*12*d); fctx.lineTo(W*0.14,sgn*12*d); fctx.stroke(); });
+    fctx.restore();
+    // converging reticle
     fctx.strokeStyle="#d8ff3d"; fctx.lineWidth=Math.max(1,d);
     fctx.beginPath(); fctx.arc(cx2,cy2,rr,0.15,Math.PI-0.15); fctx.stroke();
     fctx.beginPath(); fctx.arc(cx2,cy2,rr,Math.PI+0.15,Math.PI*2-0.15); fctx.stroke();
     fctx.beginPath();
-    fctx.moveTo(cx2-rr*1.3,cy2); fctx.lineTo(cx2-rr*0.6,cy2);
-    fctx.moveTo(cx2+rr*0.6,cy2); fctx.lineTo(cx2+rr*1.3,cy2);
-    fctx.moveTo(cx2,cy2-rr*0.6); fctx.lineTo(cx2,cy2-rr*0.25);
-    fctx.stroke();
+    fctx.moveTo(cx2-rr*1.25,cy2); fctx.lineTo(cx2-rr*0.55,cy2);
+    fctx.moveTo(cx2+rr*0.55,cy2); fctx.lineTo(cx2+rr*1.25,cy2);
+    fctx.moveTo(cx2,cy2-rr*0.55); fctx.lineTo(cx2,cy2-rr*0.2); fctx.stroke();
     fctx.fillStyle=p>0.7?"#ffb63d":"#d8ff3d";
     fctx.fillRect(cx2-1.5*d,cy2-1.5*d,3*d,3*d);
-    var stg3 = p<0.35?"INBOUND": p<0.7?"ON APPROACH":"GUNS GUNS GUNS";
-    fctx.fillStyle="#e8e4d8"; fctx.textAlign="right"; fctx.fillText(stg3,W-6*d,5*d);
+    if (p>0.7){                                     // guns: tracer dashes walking in
+      for (var tr5=0;tr5<5;tr5++){
+        var tq=((now*3+tr5*0.2)%1);
+        var tx2=cx2+(1-tq)*W*0.3, ty2=cy2+(1-tq)*H*0.24;
+        fctx.strokeStyle="rgba(255,182,61,"+tq+")";
+        fctx.beginPath(); fctx.moveTo(tx2,ty2); fctx.lineTo(tx2-5*d,ty2+4*d); fctx.stroke(); } }
+    monChecklist(["INBOUND","APPROACH","GUNS"],p,W,H,d);
+    monTele(["SPD 190kt","AGL 300m","GUN "+(p>0.7?"FIRING":"ARMED")],W,d);
   }
 }
 function drawForces(){
   if (S.mon){ drawMonitor(); return; }
   var W=fcC.width, H=fcC.height, d=window.devicePixelRatio||1;
   fctx.clearRect(0,0,W,H);
-  var u=Math.max(2,Math.round(2*d));            // 1 voxel unit
+  var u=Math.max(3,Math.round(2.6*d));          // 1 voxel unit
   function person(x,y,col){ fctx.fillStyle=col;
     fctx.fillRect(x,y,u,u);                     // head
     fctx.fillRect(x-(u>>1),y+u+1,u*2,u*2);      // body
@@ -801,12 +874,12 @@ function drawForces(){
   for (var cc=0;cc<S.cas;cc++){ missile(kx,y3+2*d,"#8a8778"); kx+=u*3; }
 }
 
-/* one operative = one doll. outline holds while they stand; goes dim when down;
-   promoted operatives get the amber head. */
-function doll(m,player){
-  var col = m.st==="OK" ? (player?"#e8e4d8":"#d8ff3d") : "#3c3c44";
+/* one operative = one doll — only for the squad the player actually runs.
+   Outline holds while they stand, dims when down, amber head when promoted. */
+function doll(m){
+  var col = m.st==="OK" ? "#e8e4d8" : "#3c3c44";
   var head = m.star&&m.st==="OK" ? "#ffb63d" : col;
-  return '<svg width="11" height="13" viewBox="0 0 11 13" style="vertical-align:middle">'
+  return '<svg width="17" height="21" viewBox="0 0 11 13" style="vertical-align:middle">'
     +'<rect x="3.5" y="0.5" width="4" height="3" fill="none" stroke="'+head+'"/>'
     +'<rect x="2.5" y="4.5" width="6" height="4" fill="none" stroke="'+col+'"/>'
     +'<rect x="0.5" y="4.5" width="1" height="3.4" fill="none" stroke="'+col+'"/>'
@@ -854,12 +927,17 @@ function renderDeck(){
   var blu=S.squads.filter(function(q){return q.side>0;});
   var hos=S.squads.filter(function(q){return q.side<0 && q.phase!=="DOWN";}).length;
   document.getElementById("squads").innerHTML = blu.map(function(q){
-    var pips=q.crew.map(function(m){ return doll(m,q.player); }).join("");
     var st2=q.phase==="WORK" ? q.op.name+" "+(q.prog|0)+"%"
           : q.phase==="INSERT" ? "→ "+q.op.name
           : q.phase;
-    return '<div class="sq'+(q.player?" mine":"")+'"><span class="nm">'+q.name+'</span>'
-      +'<span class="st">'+st2+'</span><span class="hp">'+pips+'</span></div>';
+    if (q.player){                                  // your team: the people, by name
+      var dolls=q.crew.map(function(m){ return doll(m); }).join("");
+      return '<div class="sq mine"><span class="nm">'+q.name+'</span>'
+        +'<span class="st">'+st2+'</span><span class="hp">'+dolls+'</span></div>';
+    }
+    var alive=q.crew.filter(function(m){return m.st==="OK";}).length;
+    return '<div class="sq"><span class="nm">'+q.name+'</span>'
+      +'<span class="st">'+st2+'</span><span class="hp">'+alive+'/4</span></div>';
   }).join("") + '<div id="hostiles">HOSTILE NET: '+hos+' active cell'+(hos===1?"":"s")+'</div>';
   // voxel stats: macro story
   var held=0,lost=0;
