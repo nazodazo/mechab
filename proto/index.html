@@ -88,9 +88,18 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 .sq{border:1px solid var(--line);background:var(--bg);padding:4px 9px;border-radius:8px;
   display:grid;grid-template-columns:auto 1fr auto;gap:7px;align-items:baseline}
 .sq .nm{white-space:nowrap;font-size:11px;letter-spacing:.06em}
-.sq.mine{border-color:var(--us);padding:6px 9px}
+.sq.mine{border-color:var(--us);padding:5px 9px}
 .sq.mine .nm{color:var(--us)}
-.sq.mine .hp svg{margin-left:3px}
+.sq.sqhead{padding:4px 9px;background:transparent}
+/* one row per operative: doll, name+star, role/loadout, medal strip */
+.opr{display:grid;grid-template-columns:16px auto 1fr auto;gap:6px;align-items:center;
+  padding:2px 9px;border-left:2px solid var(--line)}
+.opr.down{opacity:.45}
+.opr .opname{font-size:11px;color:var(--ink);white-space:nowrap}
+.opr .opname .star{color:var(--amber)}
+.opr .oprole{font-size:9px;color:var(--dim);letter-spacing:.04em;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.opr .opmed{font-size:10px;color:var(--amber);letter-spacing:.12em;white-space:nowrap;flex:none}
 .sq .st{font-size:10px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sq .hp{font-size:10px;white-space:nowrap}
 .sq .hp svg{margin-left:2px}
@@ -181,7 +190,11 @@ function reset(){
   var names=CS_NAMES.slice();
   for (var n3=names.length-1;n3>0;n3--){ var j3=(Math.random()*(n3+1))|0, tm=names[n3]; names[n3]=names[j3]; names[j3]=tm; }
   S.squads.forEach(function(sq){ if (sq.side<0) return;
-    for (var c3=0;c3<4;c3++) sq.crew.push({cs:names.pop()||"OP-"+c3, st:"OK", ops:0, star:false});
+    for (var c3=0;c3<4;c3++){
+      var role=ROLES[c3%ROLES.length];
+      sq.crew.push({cs:names.pop()||"OP-"+c3, st:"OK", ops:0, hits:0, star:false,
+                    role:role.id, wpn:role.wpn[(Math.random()*role.wpn.length)|0], medals:[]});
+    }
   });
   S.h=new Float32Array(N);
   genTerrain(); genHeight();
@@ -194,6 +207,20 @@ function reset(){
   tick("141 is yours. tap the map to designate their objective",'rq',true);
 }
 var CS_NAMES=["VOSS","KIRIN","DRAKE","MARA","ECHO","SABLE","HALE","IBEX","NYX","ORIN","PIKE","RUNE","TALA","VEGA","WREN","ZANE"];
+/* role = which op-type this operative is built for (matches opFor()'s ids
+   DA/SR/TG/UW directly); loadout is flavor + the tag shown in OP STATS. Squad
+   composition gets a real bonus when a member's role matches the current op. */
+var ROLES=[
+  {id:"DA", tag:"DEMO",   wpn:["BREACH CHG","SATCHEL","AT-4"]},
+  {id:"SR", tag:"RECON",  wpn:["SUPPRESSED","DRONE KIT","GHILLIE"]},
+  {id:"TG", tag:"SIGNAL", wpn:["RELAY RIG","JAMMER","LASER DES"]},
+  {id:"UW", tag:"ASSAULT",wpn:["CARBINE","SAW","GRENADIER"]},
+];
+var ROLE_BY_ID={}; ROLES.forEach(function(r){ROLE_BY_ID[r.id]=r;});
+var MEDALS={ LONE:{ic:"◈",name:"sole survivor on completion"},
+  IRON:{ic:"✚",name:"survived 2+ casualties"},
+  DA:{ic:"▲",name:"sabotage completed"}, SR:{ic:"◆",name:"espionage completed"},
+  TG:{ic:"◇",name:"uplink completed"}, UW:{ic:"■",name:"assault completed"} };
 function mkSquad(name,side,player){
   return { name:name, side:side, player:player, hp:4, morale:1, crew:[],
            phase:"STAGING", pt:2+Math.random()*4,
@@ -337,13 +364,16 @@ function opComplete(sq){
   if (sq.side>0){ S.opsDone++;
     // the op belongs to the people who walked out of it
     var up=sq.crew.filter(function(m){return m.st==="OK";});
+    var opId=sq.op.id;
     up.forEach(function(m){ m.ops++;
+      if (!m.medals.includes(opId)) m.medals.push(opId);
       if (m.ops>=2 && !m.star){ m.star=true;
         if (sq.player) tick(m.cs+" distinguished — field promotion ★","up",true);
         S.receipts.push("★ "+sq.name+" — "+m.cs+" promoted ("+m.ops+" ops)");
       }
     });
     if (up.length===1 && sq.player){
+      if (!up[0].medals.includes("LONE")) up[0].medals.push("LONE");
       tick(up[0].cs+" carried it out alone — mission accomplished","up",true);
       S.receipts.push("◈ "+up[0].cs+" — sole operative on completion. Remember the name.");
     }
@@ -385,7 +415,9 @@ function squadTick(sq,dt){
     return;
   }
   if (sq.phase==="WORK"){
-    sq.prog += dt*((sq.player&&sq.urge)?11:6.5)*sq.morale;
+    // a crew member built for this op-type carries it faster — loadout matters
+    var fit=sq.crew.some(function(m){return m.st==="OK"&&m.role===sq.op.id;});
+    sq.prog += dt*((sq.player&&sq.urge)?11:6.5)*sq.morale*(fit?1.3:1);
     blast(sq.x,sq.y,3,sq.side*0.05*dt*6);
     if (sq.player){
       sq.heat += dt*(sq.urge?1.4:0.55)*(1+Math.max(0,-S.c[((sq.y|0)*GW+(sq.x|0))]||0)*0.8);
@@ -422,7 +454,9 @@ function teamHit(sq,why){
   sq.hp--; sq.heat=Math.max(0,sq.heat-6);
   var up=sq.crew.filter(function(m){return m.st==="OK";});
   var m=up.length?up[(Math.random()*up.length)|0]:null;
-  if (m) m.st="DOWN";
+  if (m){ m.st="DOWN"; m.hits++;
+    if (m.hits>=2 && !m.medals.includes("IRON")) m.medals.push("IRON");
+  }
   var who=m?m.cs+(m.star?" ★":""):"man";
   tick(sq.name+": "+who+" down — "+why,"bad",true);
   S.receipts.push("▼ "+sq.name+" — "+who+" hit: "+why);
@@ -532,7 +566,9 @@ function end(){
         S.tide>-0.25?"MARGINAL LOSS":"COLLAPSE";
   document.getElementById("verdict").textContent=v;
   var roster=S.squads[0].crew.map(function(m){
-    return (m.st==="OK"?"▮":"▯")+" "+m.cs+(m.star?" ★":"")+" — "+m.ops+" op"+(m.ops===1?"":"s");
+    var meds=m.medals.map(function(k){return MEDALS[k].ic;}).join("");
+    return (m.st==="OK"?"▮":"▯")+" "+m.cs+(m.star?" ★":"")+" — "+ROLE_BY_ID[m.role].tag+" ("+m.wpn+") — "
+      +m.ops+" op"+(m.ops===1?"":"s")+(meds?" "+meds:"");
   }).join("\n");
   document.getElementById("receipts").innerHTML=
     "FINAL TIDE "+(S.tide*100).toFixed(0)+"% · REQ "+(S.req|0)+" · CAS "+S.cas+" · MAT "+S.mat
@@ -884,7 +920,7 @@ function drawForces(){
 function doll(m){
   var col = m.st==="OK" ? "#e8e4d8" : "#3c3c44";
   var head = m.star&&m.st==="OK" ? "#ffb63d" : col;
-  return '<svg width="17" height="21" viewBox="0 0 11 13" style="vertical-align:middle">'
+  return '<svg width="13" height="16" viewBox="0 0 11 13" style="vertical-align:middle">'
     +'<rect x="3.5" y="0.5" width="4" height="3" fill="none" stroke="'+head+'"/>'
     +'<rect x="2.5" y="4.5" width="6" height="4" fill="none" stroke="'+col+'"/>'
     +'<rect x="0.5" y="4.5" width="1" height="3.4" fill="none" stroke="'+col+'"/>'
@@ -926,6 +962,19 @@ function renderTickers(){
   var badge4 = S.mechaCd>0?(S.mechaCd|0)+"s":(S.req|0)+"";
   tkSet(3,mk, (!S.mechaUnit&&S.mechaCd<=0&&S.req>=250)?"up":false, badge4);
 }
+/* squad-focus row: doll + name + role/loadout tag + medal strip. this is the
+   one squad you actually run, so it gets the depth the other four don't. */
+function oprow(m){
+  var dead = m.st!=="OK";
+  var role = ROLE_BY_ID[m.role];
+  var meds = m.medals.map(function(k){ return '<span title="'+MEDALS[k].name+'">'+MEDALS[k].ic+'</span>'; }).join("");
+  return '<div class="opr'+(dead?" down":"")+'">'
+    +doll(m)
+    +'<span class="opname">'+m.cs+(m.star?' <b class="star">★</b>':'')+'</span>'
+    +'<span class="oprole">'+role.tag+' · '+m.wpn+'</span>'
+    +'<span class="opmed">'+meds+'</span>'
+    +'</div>';
+}
 function renderDeck(){
   drawForces();
   renderTickers();
@@ -935,10 +984,11 @@ function renderDeck(){
     var st2=q.phase==="WORK" ? q.op.name+" "+(q.prog|0)+"%"
           : q.phase==="INSERT" ? "→ "+q.op.name
           : q.phase;
-    if (q.player){                                  // your team: the people, by name
-      var dolls=q.crew.map(function(m){ return doll(m); }).join("");
-      return '<div class="sq mine"><span class="nm">'+q.name+'</span>'
-        +'<span class="st">'+st2+'</span><span class="hp">'+dolls+'</span></div>';
+    if (q.player){                                  // your team: full squad-focus roster
+      var head='<div class="sq mine sqhead"><span class="nm">'+q.name+'</span>'
+        +'<span class="st">'+st2+'</span></div>';
+      var rows=q.crew.map(function(m){ return oprow(m); }).join("");
+      return head+rows;
     }
     var alive=q.crew.filter(function(m){return m.st==="OK";}).length;
     return '<div class="sq"><span class="nm">'+q.name+'</span>'
