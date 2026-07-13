@@ -122,6 +122,16 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 #receipts b{color:var(--ink);font-weight:400}
 #again{padding:14px;background:transparent;border:1px solid var(--us);color:var(--us);
   font-family:var(--mono);letter-spacing:.14em;font-size:13px}
+/* command menu: the between-sorties surface. profile lives in localStorage. */
+#menu{position:absolute;inset:0;background:rgba(23,23,27,.97);display:none;
+  flex-direction:column;padding:40px 24px;gap:12px;z-index:6}
+#menu.on{display:flex}
+#menu h2{font-size:18px;font-weight:400;letter-spacing:.14em}
+#prof{flex:1;overflow-y:auto;font-size:11px;color:var(--dim);white-space:pre-wrap;line-height:1.7}
+#prof b{color:var(--ink);font-weight:400}
+#prof .up{color:var(--us)} #prof .star{color:var(--amber)}
+#launch{padding:14px;background:transparent;border:1px solid var(--us);color:var(--us);
+  font-family:var(--mono);letter-spacing:.14em;font-size:13px}
 </style>
 </head>
 <body>
@@ -152,7 +162,8 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
     <div class="panel"><span class="ph">VOXEL STATS</span><div id="ledger"></div></div>
     <button class="tile" id="bC"></button><button class="tile" id="bD"></button>
   </div>
-  <div id="debrief"><h2 id="verdict">—</h2><div id="receipts"></div><button id="again">RE-RUN THEATRE</button></div>
+  <div id="debrief"><h2 id="verdict">—</h2><div id="receipts"></div><button id="again">RETURN TO COMMAND</button></div>
+  <div id="menu"><h2>WARCLOCK // COMMAND</h2><div id="prof"></div><button id="launch">LAUNCH SORTIE</button></div>
 </main>
 
 <script>
@@ -195,6 +206,13 @@ function reset(){
   var names=CS_NAMES.slice();
   for (var n3=names.length-1;n3>0;n3--){ var j3=(Math.random()*(n3+1))|0, tm=names[n3]; names[n3]=names[j3]; names[j3]=tm; }
   S.squads.forEach(function(sq){ if (sq.side<0) return;
+    if (sq.player && P.crew){                      // veterans return for the next sortie
+      sq.crew=P.crew.map(function(m){
+        return {cs:m.cs, st:"OK", ops:m.ops, hits:m.hits, star:m.star,
+                role:m.role, wpn:m.wpn, medals:(m.medals||[]).slice()};
+      });
+      return;
+    }
     for (var c3=0;c3<4;c3++){
       var role=ROLES[c3%ROLES.length];
       sq.crew.push({cs:names.pop()||"OP-"+c3, st:"OK", ops:0, hits:0, star:false,
@@ -222,6 +240,15 @@ var ROLES=[
   {id:"UW", tag:"ASSAULT",wpn:["CARBINE","SAW","GRENADIER"]},
 ];
 var ROLE_BY_ID={}; ROLES.forEach(function(r){ROLE_BY_ID[r.id]=r;});
+/* ============ profile: rudimentary persistence ============ */
+/* localStorage, schema-versioned from day one. The crew ARE the save file —
+   141's named operatives carry ops/stars/medals across sorties. */
+var P=(function(){
+  try{ var p=JSON.parse(localStorage.getItem("warclock_profile"));
+       if (p && p.v===1) return p; }catch(e){}
+  return {v:1, sorties:0, wins:0, verdicts:[], crew:null};
+})();
+function saveProfile(){ try{ localStorage.setItem("warclock_profile",JSON.stringify(P)); }catch(e){} }
 var MEDALS={ LONE:{ic:"◈",name:"sole survivor on completion"},
   IRON:{ic:"✚",name:"survived 2+ casualties"},
   DA:{ic:"▲",name:"sabotage completed"}, SR:{ic:"◆",name:"espionage completed"},
@@ -588,7 +615,7 @@ function end(){
   // bands calibrated so ~60% ground is the AVERAGE sortie — a plain HOLD,
   // not a headline. LANDSLIDE is reserved for genuinely abnormal outcomes.
   var v = gp<0.45?"COLLAPSE — THEATRE LOST": gp<0.55?"CONTESTED — BELOW EXPECTATION":
-          gp<=0.70?"HOLD — SORTIE PAR": gp<=0.85?"DECISIVE — ABOVE THE LINE":
+          gp<=0.70?"HOLD": gp<=0.85?"DECISIVE — ABOVE THE LINE":
           "LANDSLIDE — THEATRE TAKEN";
   document.getElementById("verdict").textContent=v;
   // performance modifiers: named hooks, not a hidden weighted score
@@ -605,11 +632,32 @@ function end(){
       +m.ops+" op"+(m.ops===1?"":"s")+(meds?" "+meds:"");
   }).join("\n");
   document.getElementById("receipts").innerHTML=
-    "GROUND "+(gp*100).toFixed(0)+"% (par 60%) · REQ "+(S.req|0)+" · CAS "+S.cas+" · MAT "+S.mat
+    "GROUND "+(gp*100).toFixed(0)+"% · REQ "+(S.req|0)+" · CAS "+S.cas+" · MAT "+S.mat
     +(mods.length?"\n"+mods.map(function(md){return "◈ "+md;}).join("\n"):"")
     +"\n\n<b>141 ROSTER</b>\n"+roster
     +"\n\n"+(S.receipts.length?S.receipts.join("\n"):"(no operations)");
   document.getElementById("debrief").classList.add("on");
+  // record the sortie: verdict history + the crew as they now stand
+  P.sorties++; if (gp>=0.55) P.wins++;
+  P.verdicts.unshift(v.split(" — ")[0]); if (P.verdicts.length>8) P.verdicts.length=8;
+  P.crew=S.squads[0].crew.map(function(m){
+    return {cs:m.cs, ops:m.ops, hits:m.hits, star:m.star, role:m.role, wpn:m.wpn, medals:m.medals.slice()};
+  });
+  saveProfile();
+}
+function showMenu(){
+  var lines=["<b>SORTIES</b> "+P.sorties+" · <b>HOLDS+</b> "+P.wins
+    +(P.verdicts.length?"\n<b>RECORD</b> "+P.verdicts.join(" · "):"")];
+  if (P.crew){
+    lines.push("\n<b>141 ROSTER — standing force</b>");
+    P.crew.forEach(function(m){
+      var meds=(m.medals||[]).map(function(k){return MEDALS[k].ic;}).join("");
+      lines.push("▮ "+m.cs+(m.star?' <span class="star">★</span>':'')+" — "+ROLE_BY_ID[m.role].tag
+        +" ("+m.wpn+") — "+m.ops+" op"+(m.ops===1?"":"s")+(meds?' <span class="star">'+meds+'</span>':''));
+    });
+  } else lines.push("\nfresh theatre — a new team draws callsigns on launch");
+  document.getElementById("prof").innerHTML=lines.join("\n");
+  document.getElementById("menu").classList.add("on");
 }
 
 /* topographic overlay: sampled at HGW×HGH (~15k), independent of the ~7k
@@ -760,12 +808,7 @@ function renderTrend(){
   function yOf(v){ return H/2-(v-mid)/span*H*0.86; }
   tctx.strokeStyle="#34343c"; tctx.setLineDash([3,4]);
   tctx.beginPath(); tctx.moveTo(0,yOf(0)); tctx.lineTo(W-PADR,yOf(0)); tctx.stroke();
-  // PAR: the average-sortie line (60% ground). Beat it or explain yourself.
-  tctx.strokeStyle="#4a4a3a";
-  tctx.beginPath(); tctx.moveTo(0,yOf(0.2)); tctx.lineTo(W-PADR,yOf(0.2)); tctx.stroke();
   tctx.setLineDash([]);
-  tctx.fillStyle="#8a8778"; tctx.font=(8*(window.devicePixelRatio||1))+"px monospace";
-  tctx.textAlign="left"; tctx.fillText("PAR",W-PADR+3,yOf(0.2)+3);
   tctx.strokeStyle=S.tide>=0?"#d8ff3d":"#ff5a2a"; tctx.lineWidth=2;
   tctx.beginPath();
   for (var k2=0;k2<n2;k2++){ tctx.lineTo(k2/(n2-1)*(W-PADR),yOf(S.hist[k2])); }
@@ -1120,7 +1163,7 @@ function renderDeck(){
   var lastOp=S.receipts.length?S.receipts[S.receipts.length-1]:"no operations logged yet";
   document.getElementById("ledger").innerHTML=
     '<div class="lrow"><span>REQ / CAS / MAT</span><span><b>'+(S.req|0)+'</b> / <b>'+S.cas+'</b> / <b>'+S.mat+'</b></span></div>'
-    +'<div class="lrow"><span>GROUND (par 60)</span><span><b class="up">'+Math.round(gpL*100)+'%</b> / <b class="bad">'+Math.round((1-gpL)*100)+'%</b></span></div>'
+    +'<div class="lrow"><span>GROUND</span><span><b class="up">'+Math.round(gpL*100)+'%</b> / <b class="bad">'+Math.round((1-gpL)*100)+'%</b></span></div>'
     +'<div class="lrow"><span>LINE KIA</span><span><b class="up">'+S.kiaB+'</b> / <b class="bad">'+S.kiaO+'</b></span></div>'
     +'<div class="lrow"><span>OPS DONE</span><span><b>'+S.opsDone+'</b> · ELAPSED <b>'+(180-S.t|0)+'s</b></span></div>'
     +'<div class="lrow"><span>HOSTILE NET</span><span><b class="bad">'+hos+'</b> active cell'+(hos===1?"":"s")+'</span></div>'
@@ -1194,7 +1237,14 @@ document.getElementById("btnpause").addEventListener("click",function(){
   this.textContent=S.paused?"▶":"⏸"; this.classList.toggle("on",S.paused);
 });
 document.getElementById("again").addEventListener("click",function(){
-  document.getElementById("debrief").classList.remove("on"); reset();
+  document.getElementById("debrief").classList.remove("on");
+  reset(); S.paused=true; showMenu();
+});
+document.getElementById("launch").addEventListener("click",function(){
+  document.getElementById("menu").classList.remove("on");
+  S.paused=false;
+  var bp=document.getElementById("btnpause");
+  bp.textContent="⏸"; bp.classList.remove("on");
 });
 
 /* ================= loop ================= */
@@ -1207,7 +1257,9 @@ function loop(now){
   tickMarquees(dt);
   requestAnimationFrame(loop);
 }
-fit(mapC); fit(trC); fit(fcC); initTapes(); reset(); requestAnimationFrame(loop);
+fit(mapC); fit(trC); fit(fcC); initTapes(); reset();
+S.paused=true; showMenu();                      // boot into command, not mid-war
+requestAnimationFrame(loop);
 </script>
 </body>
 </html>
