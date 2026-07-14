@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+<title>WARCLOCK // ARSENAL TREE</title>
+<style>
+/* Arsenal tree v1 — the tech-tree surface. Every bench COMMIT/discovery grew
+   a node in P.tree[weapon]; this page renders each weapon's growth as a
+   radial tree (root = the weapon's seed, depth = radius, branch = the corner
+   of the lattice you tuned from). Reads the same warclock_profile the
+   theatre and bench share. */
+:root{
+  --bg:#17171b; --panel:#1e1e24; --ink:#e8e4d8; --dim:#8a8778; --line:#34343c;
+  --us:#d8ff3d; --foe:#ff5a2a; --amber:#ffb63d;
+  --mono:"SF Mono",ui-monospace,"Cascadia Mono","Roboto Mono",Consolas,monospace;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0}
+html,body{height:100%;overflow:hidden}
+body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
+  font-family:var(--mono);font-size:12px;line-height:1.35;
+  -webkit-user-select:none;user-select:none;overscroll-behavior:none;display:flex;justify-content:center}
+@supports (height:100dvh){ html,body{height:100dvh} }
+#device{width:100%;max-width:460px;height:100%;max-height:960px;overflow:hidden;display:flex;flex-direction:column;gap:7px;
+  padding:calc(8px + env(safe-area-inset-top)) 10px calc(10px + env(safe-area-inset-bottom))}
+.card{border:1px solid var(--line);background:var(--panel);border-radius:5px;
+  display:flex;flex-direction:column;overflow:hidden}
+.card>.ph{flex:none;padding:5px 10px 2px;font-size:9px;letter-spacing:.18em;color:var(--dim);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+#top{flex:none;display:flex;gap:7px}
+#info{flex:1;min-width:0;padding:6px 10px}
+#info b{color:var(--ink);font-weight:400;font-size:12px}
+#info .d{font-size:10px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#ctrl{width:32%;flex:none;padding:6px 8px;display:flex;flex-direction:column;gap:3px;align-items:stretch}
+#ctrl button{background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:3px;
+  font-family:var(--mono);font-size:10px;letter-spacing:.06em;padding:3px 6px;touch-action:manipulation}
+#ctrl button:active{background:var(--ink);color:var(--bg)}
+
+#atick{flex:none;height:20px;border:1px solid var(--line);background:var(--bg);
+  border-radius:4px;overflow:hidden}
+#atick canvas{width:100%;height:100%;display:block}
+
+/* the tree monitor — the page's OP-MONITOR */
+#treewrap{flex:2.2;min-height:0;padding:0 6px 6px}
+#tree{width:100%;height:100%;display:block}
+
+/* telemetry strip under the tree */
+#tele{flex:none;border:1px solid var(--line);background:var(--bg);border-radius:4px;
+  padding:4px 10px;font-size:10px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#tele b{color:var(--amber);font-weight:400}
+
+/* bottom: weapon selector */
+#bottom{flex:1;min-height:0;display:flex;gap:7px}
+#weplist{flex:1;min-height:0;overflow-y:auto}
+#weplist .li{font-size:10px;padding:4px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  color:var(--dim);width:100%;text-align:left;background:transparent;border:none;border-left:2px solid transparent;
+  font-family:var(--mono);touch-action:manipulation;display:block}
+#weplist .li b{color:var(--us);font-weight:400}
+#weplist .li.sel{color:var(--ink);border-left-color:var(--amber);background:rgba(255,182,61,.08)}
+#weplist .li:active{background:rgba(255,182,61,.16)}
+#wepstats{flex:1;min-height:0}
+#wepstats .lrow{display:flex;justify-content:space-between;font-size:10px;color:var(--dim);padding:1px 10px}
+#wepstats .lrow b{color:var(--ink);font-weight:400}
+</style>
+</head>
+<body>
+<main id="device">
+  <div id="top">
+    <div class="card" id="info"><span class="ph">ARSENAL TREE</span>
+      <div id="infoline"><b>—</b></div><div class="d" id="infodesc">—</div></div>
+    <div class="card" id="ctrl"><span class="ph">CONTROLS</span>
+      <button id="bbench">◂ BENCH</button><button id="bcommand">◂ COMMAND</button></div>
+  </div>
+  <div id="atick"><canvas id="atickc"></canvas></div>
+  <div class="card" id="treewrap"><span class="ph">GROWTH MONITOR — COMMITS AS BRANCHES</span><canvas id="tree"></canvas></div>
+  <div id="tele">tap a node to read it</div>
+  <div id="bottom">
+    <div class="card" id="weplist"><span class="ph">ARSENAL</span><div id="weprows"></div></div>
+    <div class="card" id="wepstats"><span class="ph">SELECTED NODE</span><div id="nodestats"></div></div>
+  </div>
+</main>
+
+<script>
+"use strict";
+function clamp(v){ return v<0?0:v>1?1:v; }
+
+/* shared profile — same key theatre and bench use */
+var P=(function(){
+  try{ var p=JSON.parse(localStorage.getItem("warclock_profile"));
+       if (p && p.v===1) return p; }catch(e){}
+  return {v:1, sorties:0, wins:0, verdicts:[], crew:null};
+})();
+if (!P.arsenal) P.arsenal={};
+if (!P.unlocks) P.unlocks={};
+if (!P.builds) P.builds={};
+if (!P.tree) P.tree={};
+
+/* same recipe roster as the bench (names/desc only — no eval here) */
+var RECIPES=[
+  {id:"TOMAHAWK", kind:"tune", name:"TOMAHAWK RE-TUNE", desc:"airframe calibration — sharper strike"},
+  {id:"ORBITAL", kind:"tune", name:"ORBITAL COHERENCE", desc:"beam discipline — wider lance"},
+  {id:"MECHA", kind:"tune", name:"CHASSIS RESONANCE", desc:"drop readiness — faster cycle"},
+  {id:"CLUSTER", kind:"unlock", name:"CLUSTER TOMAHAWK", desc:"one bird, three warheads — 2 MAT"},
+  {id:"EMP", kind:"unlock", name:"EMP LANCE", desc:"kills systems, not people — dismantles forts"},
+  {id:"FIRESTORM", kind:"unlock", name:"FIRESTORM BARRAGE", desc:"rolling artillery — aggressive build"},
+];
+var AXIS_COL={POW:"#ff5a2a", EFF:"#d8ff3d", VOL:"#ffb63d"};
+
+var selectedId = (P.selectedArsenal && RECIPES.some(function(r){return r.id===P.selectedArsenal;}))
+  ? P.selectedArsenal : RECIPES[0].id;
+var selectedNode=-1;                              // index into P.tree[selectedId], -1 = root
+
+/* ============ ticker tape (same primitives as theatre/bench) ============ */
+var TAPE_COL={ up:"#d8ff3d", bad:"#ff5a2a", rq:"#ffb63d", team:"#e8e4d8",
+               ink:"#e8e4d8", dim:"#8a8778", sep:"#4a4a54" };
+function mkTape(canvas,fontPx,speed){
+  return { c:canvas, ctx:canvas.getContext("2d"), fontPx:fontPx, speed:speed,
+           runs:[], widths:[], w:0, off:0, dirty:true, pending:null };
+}
+function tapeSet(tp,runs){
+  if (!tp.runs.length){ tp.runs=runs; tp.dirty=true; }
+  else tp.pending=runs;
+}
+function tapeMeasure(tp,ctx){
+  tp.widths.length=0; var w=0;
+  for (var k=0;k<tp.runs.length;k++){
+    var rw=ctx.measureText(tp.runs[k].t).width; tp.widths.push(rw); w+=rw;
+  }
+  tp.w=Math.max(1,w); tp.dirty=false;
+}
+function tapeDraw(tp,dt){
+  var c=tp.c, r=c.getBoundingClientRect();
+  if (!r.width) return;
+  var d=window.devicePixelRatio||1, cw=Math.round(r.width*d), ch=Math.round(r.height*d);
+  if (c.width!==cw||c.height!==ch){ c.width=cw; c.height=ch; tp.dirty=true; }
+  var ctx=tp.ctx;
+  ctx.font=(tp.fontPx*d)+"px "+'"SF Mono",ui-monospace,Consolas,monospace';
+  ctx.textBaseline="middle";
+  if (tp.dirty) tapeMeasure(tp,ctx);
+  tp.off+=tp.speed*d*dt;
+  if (tp.off>=tp.w){
+    tp.off-=tp.w;
+    if (tp.pending){ tp.runs=tp.pending; tp.pending=null; tapeMeasure(tp,ctx);
+      if (tp.off>=tp.w) tp.off%=tp.w; }
+  }
+  ctx.clearRect(0,0,cw,ch);
+  var y=ch/2, x=-tp.off, guard=0;
+  while (x<cw && guard++<40){
+    for (var k2=0;k2<tp.runs.length;k2++){
+      var rw=tp.widths[k2];
+      if (x+rw>0 && x<cw){ ctx.fillStyle=tp.runs[k2].col; ctx.fillText(tp.runs[k2].t,x,y); }
+      x+=rw;
+    }
+  }
+}
+function runsFrom(items){
+  var runs=[];
+  items.forEach(function(it){
+    runs.push({t:it[0],col:TAPE_COL[it[1]]||TAPE_COL.dim});
+    runs.push({t:"  ◆  ",col:TAPE_COL.sep});
+  });
+  return runs;
+}
+var TAPES={ a: mkTape(document.getElementById("atickc"),10,26) };
+
+/* ============ radial tree layout ============
+   root at center; each node's radius = its depth (commits since the seed),
+   angle inherited from its parent with siblings fanned apart. Same polar
+   coordinate language as the bench's old radial gauges — the weapon grows
+   outward from its seed. */
+var tree=document.getElementById("tree");
+var layout=[];                                    // [{x,y,node,idx,depth}] recomputed per render
+function layoutTree(){
+  layout.length=0;
+  var nodes=P.tree[selectedId]||[];
+  var depth=[], children={};
+  nodes.forEach(function(n,i){
+    depth[i]=(n.parent<0)?1:depth[n.parent]+1;
+    var pk=String(n.parent);
+    (children[pk]=children[pk]||[]).push(i);
+  });
+  var maxDepth=1; depth.forEach(function(dd){ if (dd>maxDepth) maxDepth=dd; });
+  var angle=[];
+  function assign(idx,a0,a1){
+    var mid=(a0+a1)/2; angle[idx]=mid;
+    var kids=children[String(idx)]||[];
+    kids.forEach(function(k,ki){
+      var span=(a1-a0)/kids.length;
+      assign(k, a0+ki*span, a0+(ki+1)*span);
+    });
+  }
+  var roots=children["-1"]||[];
+  roots.forEach(function(rt,ri){
+    var span=Math.PI*2/Math.max(1,roots.length);
+    assign(rt, -Math.PI/2+ri*span, -Math.PI/2+(ri+1)*span);
+  });
+  layout.push({x:0.5,y:0.5,node:null,idx:-1,depth:0});   // the seed
+  nodes.forEach(function(n,i){
+    var rr=depth[i]/(maxDepth+0.6)*0.44;
+    layout.push({ x:0.5+rr*Math.cos(angle[i]), y:0.5+rr*Math.sin(angle[i]),
+                  node:n, idx:i, depth:depth[i] });
+  });
+}
+function drawTree(){
+  var d=window.devicePixelRatio||1, r=tree.getBoundingClientRect();
+  if (!r.width) return;
+  var W=Math.round(r.width*d), H=Math.round(r.height*d);
+  if (tree.width!==W||tree.height!==H){ tree.width=W; tree.height=H; }
+  var ctx=tree.getContext("2d");
+  ctx.clearRect(0,0,W,H);
+  var pulse=0.5+0.5*Math.sin(performance.now()/400);
+  // depth rings — the MK tiers
+  var maxD=1; layout.forEach(function(L){ if (L.depth>maxD) maxD=L.depth; });
+  ctx.strokeStyle="#26262d"; ctx.lineWidth=Math.max(1,d);
+  for (var t2=1;t2<=maxD;t2++){
+    var rr=t2/(maxD+0.6)*0.44*Math.min(W,H);
+    ctx.beginPath(); ctx.arc(W/2,H/2,rr,0,Math.PI*2); ctx.stroke();
+  }
+  // edges
+  ctx.lineWidth=Math.max(1,d);
+  layout.forEach(function(L){
+    if (!L.node) return;
+    var p = L.node.parent<0 ? layout[0] : layout.filter(function(o){return o.idx===L.node.parent;})[0];
+    if (!p) return;
+    ctx.strokeStyle="#4a4a54";
+    ctx.beginPath(); ctx.moveTo(p.x*W,p.y*H); ctx.lineTo(L.x*W,L.y*H); ctx.stroke();
+  });
+  // nodes — square voxel bits in the axis color, selected one ringed
+  layout.forEach(function(L){
+    var sz=(L.node?7:9)*d;
+    var col=L.node?(AXIS_COL[L.node.axis]||"#e8e4d8"):"#8a8778";
+    ctx.fillStyle=col;
+    if (L.idx===selectedNode){
+      ctx.globalAlpha=0.55+0.45*pulse;
+      ctx.strokeStyle=col; ctx.lineWidth=Math.max(1,d);
+      ctx.strokeRect(L.x*W-sz, L.y*H-sz, sz*2, sz*2);
+    }
+    ctx.fillRect(L.x*W-sz/2, L.y*H-sz/2, sz, sz);
+    ctx.globalAlpha=1;
+  });
+  // empty-tree hint
+  if (layout.length<=1){
+    ctx.fillStyle="#8a8778"; ctx.font=(10*d)+"px monospace"; ctx.textAlign="center";
+    ctx.fillText("no commits yet — tune and COMMIT on the bench", W/2, H/2+26*d);
+  }
+}
+tree.addEventListener("click",function(ev){
+  var r=tree.getBoundingClientRect();
+  var mx=(ev.clientX-r.left)/r.width, my=(ev.clientY-r.top)/r.height;
+  var best=-1, bestD=0.004;                        // generous tap radius (normalized²)
+  layout.forEach(function(L){
+    if (!L.node) return;
+    var dd=Math.pow(L.x-mx,2)+Math.pow(L.y-my,2);
+    if (dd<bestD){ bestD=dd; best=L.idx; }
+  });
+  selectedNode=best;
+  renderStatic();
+});
+
+/* ============ readouts ============ */
+function recipeById(id){ return RECIPES.filter(function(r){return r.id===id;})[0]; }
+function renderStatic(){
+  var cur=recipeById(selectedId), nodes=P.tree[selectedId]||[];
+  document.getElementById("infoline").innerHTML="<b>"+cur.name+"</b>";
+  document.getElementById("infodesc").textContent=cur.desc;
+  // weapon selector
+  var rows=[];
+  RECIPES.forEach(function(rp){
+    var n=(P.tree[rp.id]||[]).length;
+    var mk = rp.kind==="tune" ? "MK "+(1+n) : (P.unlocks[rp.id]?"deployable":"locked");
+    rows.push('<button class="li'+(rp.id===selectedId?' sel':'')+'" data-id="'+rp.id+'">'
+      +rp.id+' — '+mk+' · '+n+' commit'+(n===1?'':'s')+'</button>');
+  });
+  document.getElementById("weprows").innerHTML=rows.join("");
+  // node stats
+  var html;
+  if (selectedNode>=0 && nodes[selectedNode]){
+    var n2=nodes[selectedNode];
+    html='<div class="lrow"><span>NODE</span><b>#'+(selectedNode+1)+'</b></div>'
+      +'<div class="lrow"><span>AXIS</span><b>'+n2.axis+'</b></div>'
+      +'<div class="lrow"><span>EFF</span><b>'+Math.round(n2.eff*100)+'</b></div>'
+      +'<div class="lrow"><span>POW</span><b>'+Math.round(n2.pow*100)+'</b></div>'
+      +'<div class="lrow"><span>VOL</span><b>'+Math.round(n2.vol*100)+'</b></div>'
+      +'<div class="lrow"><span>BUILD</span><b>'+n2.sl.map(function(v){return Math.round(v*100);}).join("/")+'</b></div>';
+    document.getElementById("tele").innerHTML="node <b>#"+(selectedNode+1)+"</b> — "
+      +n2.axis+"-dominant commit, build "+n2.sl.map(function(v){return Math.round(v*100);}).join("/")
+      +(n2.parent>=0?(" branched from #"+(n2.parent+1)):" grown from the seed");
+  } else {
+    html='<div class="lrow"><span>COMMITS</span><b>'+nodes.length+'</b></div>'
+      +'<div class="lrow"><span>BRANCHES</span><b>'+nodes.filter(function(n3){return n3.parent<0;}).length+'</b></div>';
+    document.getElementById("tele").innerHTML=nodes.length
+      ? "tap a node to read it — "+nodes.length+" commit"+(nodes.length===1?"":"s")+" grown"
+      : "no growth yet — commit builds on the bench to grow this weapon";
+  }
+  document.getElementById("nodestats").innerHTML=html;
+  // ticker
+  var items=[["ARSENAL TREE","ink"],[cur.id+" — "+nodes.length+" commits","rq"]];
+  var axes={}; nodes.forEach(function(n4){ axes[n4.axis]=(axes[n4.axis]||0)+1; });
+  Object.keys(axes).forEach(function(a){ items.push([a+" ×"+axes[a], a==="POW"?"bad":a==="EFF"?"up":"rq"]); });
+  var unlocked=RECIPES.filter(function(rp2){return rp2.kind==="unlock"&&P.unlocks[rp2.id];}).length;
+  items.push([unlocked+"/3 discoveries unlocked", unlocked===3?"up":"dim"]);
+  tapeSet(TAPES.a, runsFrom(items));
+  layoutTree();
+}
+document.getElementById("weprows").addEventListener("click",function(e){
+  var b=e.target.closest?e.target.closest(".li"):null;
+  if (!b) return;
+  selectedId=b.getAttribute("data-id"); selectedNode=-1;
+  P.selectedArsenal=selectedId;
+  try{ localStorage.setItem("warclock_profile",JSON.stringify(P)); }catch(e2){}
+  renderStatic();
+});
+document.getElementById("bcommand").addEventListener("click",function(){ location.href="index.html"; });
+document.getElementById("bbench").addEventListener("click",function(){ location.href="bench.html"; });
+
+/* ================= loop ================= */
+renderStatic();
+window.addEventListener("resize",renderStatic);
+var last=performance.now();
+function loop(now){
+  var dt=Math.min(0.1,(now-last)/1000); last=now;
+  drawTree();
+  tapeDraw(TAPES.a,dt);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

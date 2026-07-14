@@ -25,7 +25,8 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
   padding:calc(8px + env(safe-area-inset-top)) 10px calc(10px + env(safe-area-inset-bottom))}
 .card{border:1px solid var(--line);background:var(--panel);border-radius:5px;
   display:flex;flex-direction:column;overflow:hidden}
-.card>.ph{flex:none;padding:5px 10px 2px;font-size:9px;letter-spacing:.18em;color:var(--dim)}
+.card>.ph{flex:none;padding:5px 10px 2px;font-size:9px;letter-spacing:.18em;color:var(--dim);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* top: infomatics + controls */
 #top{flex:none;display:flex;gap:7px}
@@ -37,14 +38,29 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
   font-family:var(--mono);font-size:10px;letter-spacing:.06em;padding:3px 6px;touch-action:manipulation}
 #ctrl button:active{background:var(--ink);color:var(--bg)}
 
-/* gauges: three radial voxel saturation dials */
-#gaugerow{flex:0.85;min-height:0;display:flex;gap:7px}
+/* gauges: three radial voxel saturation dials, landscape ellipses */
+#gaugerow{flex:0.51;min-height:0;display:flex;gap:7px}
 .gcard{flex:1;min-width:0;padding:0 4px 4px}
 .gcard canvas{width:100%;height:100%;display:block}
 
+/* gauge-informatics ticker */
+#gtick{flex:none;height:20px;border:1px solid var(--line);background:var(--bg);
+  border-radius:4px;overflow:hidden}
+#gtick canvas{width:100%;height:100%;display:block}
+
 /* quadrant lattice */
 #quadwrap{flex:1.5;min-height:0;padding:0 6px 6px}
+#quadinner{position:relative;width:100%;height:100%;min-height:0;flex:1;
+  padding:22px 0}                                  /* reserved label bands, voxels stay clear */
 #quad{width:100%;height:100%;display:block}
+.qlabel{position:absolute;pointer-events:none;font-size:7px;letter-spacing:.04em;
+  color:#8a8778;line-height:1.4;max-width:46%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qlabel b{color:#e8e4d8;font-weight:400}
+.qlabel .sc{display:block;font-size:6px;color:#6a6860}
+.qlabel.tl{top:0;left:2px;text-align:left}
+.qlabel.tr{top:0;right:2px;text-align:right}
+.qlabel.bl{bottom:0;left:2px;text-align:left}
+.qlabel.br{bottom:0;right:2px;text-align:right}
 
 /* hint ticker */
 #hint{flex:none;border:1px solid var(--line);background:var(--bg);border-radius:4px;
@@ -95,14 +111,22 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
     <div class="card" id="info"><span class="ph">ARSENAL INFOMATICS</span>
       <div id="infoline"><b>—</b></div><div class="d" id="infodesc">—</div><div class="d" id="sortiecount">—</div></div>
     <div class="card" id="ctrl"><span class="ph">CONTROLS</span>
-      <button id="breset">RESET SLIDERS</button><button id="bcommand">◂ COMMAND</button></div>
+      <button id="breset">RESET SLIDERS</button><button id="barsenal">ARSENAL TREE</button><button id="bcommand">◂ COMMAND</button></div>
   </div>
   <div id="gaugerow">
-    <div class="card gcard"><span class="ph">EFF</span><canvas id="g0"></canvas></div>
-    <div class="card gcard"><span class="ph">POW</span><canvas id="g1"></canvas></div>
-    <div class="card gcard"><span class="ph">VOL</span><canvas id="g2"></canvas></div>
+    <div class="card gcard"><span class="ph">EFFICIENCY</span><canvas id="g0"></canvas></div>
+    <div class="card gcard"><span class="ph">POWER</span><canvas id="g1"></canvas></div>
+    <div class="card gcard"><span class="ph">VOLATILITY</span><canvas id="g2"></canvas></div>
   </div>
-  <div class="card" id="quadwrap"><span class="ph">LATTICE — THERMAL / KINETIC / EM / PAYLOAD</span><canvas id="quad"></canvas></div>
+  <div id="gtick"><canvas id="gtickc"></canvas></div>
+  <div class="card" id="quadwrap"><span class="ph">LATTICE — THERMAL / KINETIC / EM / PAYLOAD</span>
+    <div id="quadinner"><canvas id="quad"></canvas>
+      <div class="qlabel tl" id="qlTH"></div>
+      <div class="qlabel tr" id="qlKN"></div>
+      <div class="qlabel bl" id="qlEM"></div>
+      <div class="qlabel br" id="qlPL"></div>
+    </div>
+  </div>
   <div id="hint">bench idle — move the sliders, TEST to read the lattice</div>
   <div id="bottom">
     <div id="leftcol">
@@ -139,6 +163,7 @@ var P=(function(){
 if (!P.arsenal) P.arsenal={};
 if (!P.unlocks) P.unlocks={};
 if (!P.builds) P.builds={};       // per-weapon slider profile — each recipe keeps its own build
+if (!P.tree) P.tree={};           // per-weapon commit history — the arsenal tech tree
 function saveP(){ try{ localStorage.setItem("warclock_profile",JSON.stringify(P)); }catch(e){} }
 
 /* ============ the formula space ============ */
@@ -209,15 +234,18 @@ function loadBuild(id){
   [0,1,2].forEach(function(k){ document.getElementById("s"+k).value=Math.round(SL[k]*100); });
 }
 function selectArsenal(id){
-  selectedId=id; P.selectedArsenal=id; saveP(); loadBuild(id); render();
+  selectedId=id; P.selectedArsenal=id; saveP(); loadBuild(id); renderStatic();
 }
 
-/* ============ gauges: radial voxel saturation, center-out ============
-   ~361 voxels each × 3 ≈ 1080. The saturation band starts at the core and
-   pushes outward as the metric rises — a full dial is a green outer ring
-   with only a faint ember left in the middle. Tight packing (few gaps)
-   reads as one continuous dial rather than a scatter of dots. */
-var GN=19;
+/* ============ gauges: voxel spectral bar, discrete cells ============
+   Each voxel is a distinct square with breathing room, drawn in the earlier
+   build's language: lit voxels are large and saturated, dim baseline voxels
+   are small and faint. The full red → amber → green spectrum is always
+   visible as the dim baseline; the traveling value band lights the region
+   around the current reading. Position along the bar drives color — g1:1
+   (widest, red) at the low end, g1:4 (narrowest, green) at the high end. */
+var GNX=19, GNY=11;
+var GAUGE_ZONES=[0,0.45,0.7,0.85,1.0];            // g1:1..g1:4 boundaries, wide→narrow
 function drawGauge(cv,val,invert){
   var d=window.devicePixelRatio||1, r=cv.getBoundingClientRect();
   if (!r.width) return;
@@ -225,34 +253,121 @@ function drawGauge(cv,val,invert){
   if (cv.width!==W||cv.height!==H){ cv.width=W; cv.height=H; }
   var ctx=cv.getContext("2d");
   ctx.clearRect(0,0,W,H);
-  var side=Math.min(W,H), ox=(W-side)/2, oy=(H-side)/2;
-  var cw=side/GN, ch=side/GN, cx=(GN-1)/2, cy=(GN-1)/2, maxr=Math.hypot(cx,cy);
+  // square 1:1 bits: cell side is the limiting dimension, grid centered
+  var cell=Math.min(W/GNX,H/GNY), gx=Math.floor(W/cell), gy=Math.floor(H/cell);
+  var ox=(W-gx*cell)/2, oy=(H-gy*cell)/2;
   var s=invert?1-val:val;                        // VOL reads inverted: calm = saturated
-  for (var iy=0;iy<GN;iy++) for (var ix=0;ix<GN;ix++){
-    var rr=Math.hypot(ix-cx,iy-cy)/maxr;         // 0 core → 1 rim
-    var band=Math.exp(-Math.pow((rr-s)/0.22,2)); // the traveling saturation band
-    var ember=Math.exp(-Math.pow(rr/0.25,2))*0.5*s; // faint residue left at the core
+  for (var iy=0;iy<gy;iy++) for (var ix=0;ix<gx;ix++){
+    var pos=gx>1?ix/(gx-1):0;                    // 0 red end → 1 green end, linear
+    var band=Math.exp(-Math.pow((pos-s)/0.20,2)); // the traveling value band
     var dith=(hash2(ix,iy)-0.5)*0.15;
-    var lit=band+dith>0.35, emb=!lit&&(ember+dith>0.18);
-    if (lit){
-      // color rides the radius: core red → mid amber → rim green
-      var cr = rr<0.35?[255,90,42] : rr<0.65?[255,182,61] : [216,255,61];
-      ctx.fillStyle="rgba("+cr[0]+","+cr[1]+","+cr[2]+","+(0.35+band*0.6)+")";
-    } else if (emb){
-      ctx.fillStyle="rgba(255,182,61,"+(0.10+ember*0.15)+")";
-    } else {
-      ctx.fillStyle="rgba(232,228,216,0.05)";
-    }
-    var sz=Math.min(cw,ch)*(lit?0.86:0.5);
-    ctx.fillRect(ox+ix*cw+(cw-sz)/2, oy+iy*ch+(ch-sz)/2, sz, sz);
+    var lit=band+dith>0.35;
+    // color rides position along the bar: g1:1 red → g1:2/3 amber → g1:4 green
+    var cr = pos<GAUGE_ZONES[1]?[255,90,42] : pos<GAUGE_ZONES[3]?[255,182,61] : [216,255,61];
+    // spectrum always visible: dim baseline voxels everywhere, lit band on top
+    var alpha = lit ? 0.45+band*0.5 : 0.16+dith;
+    ctx.fillStyle="rgba("+cr[0]+","+cr[1]+","+cr[2]+","+alpha+")";
+    var g=1*d, sz=Math.max(1,cell-g*2);           // 1px gap each side, square bit
+    ctx.fillRect(ox+ix*cell+g, oy+iy*cell+g, sz, sz);
   }
-  ctx.fillStyle="#8a8778"; ctx.font=(8*d)+"px monospace"; ctx.textAlign="center";
-  ctx.fillText(Math.round(val*100), W/2, oy+side-3*d);
+  ctx.fillStyle="#e8e4d8"; ctx.font=(8*d)+"px monospace"; ctx.textAlign="center";
+  ctx.fillText(Math.round(val*100), W/2, H-3*d);
 }
+
+/* ============ ticker tape: canvas-drawn, ported verbatim from index.html ============ */
+/* A tape is a list of colored text runs drawn onto a canvas at x = -offset and
+   repeated until the window is filled. The scroll is one modulo counter; there
+   is nothing to measure but ctx.measureText and nothing to seam. Content can
+   change mid-scroll without touching the offset. */
+var TAPE_COL={ up:"#d8ff3d", bad:"#ff5a2a", rq:"#ffb63d", team:"#e8e4d8",
+               ink:"#e8e4d8", dim:"#8a8778", sep:"#4a4a54" };
+function mkTape(canvas,fontPx,speed){
+  return { c:canvas, ctx:canvas.getContext("2d"), fontPx:fontPx, speed:speed,
+           runs:[], widths:[], w:0, off:0, dirty:true, pending:null };
+}
+function tapeSet(tp,runs){
+  if (!tp.runs.length){ tp.runs=runs; tp.dirty=true; }
+  else tp.pending=runs;
+}
+function tapeMeasure(tp,ctx){
+  tp.widths.length=0; var w=0;
+  for (var k=0;k<tp.runs.length;k++){
+    var rw=ctx.measureText(tp.runs[k].t).width; tp.widths.push(rw); w+=rw;
+  }
+  tp.w=Math.max(1,w); tp.dirty=false;
+}
+function tapeDraw(tp,dt){
+  var c=tp.c, r=c.getBoundingClientRect();
+  if (!r.width) return;
+  var d=window.devicePixelRatio||1, cw=Math.round(r.width*d), ch=Math.round(r.height*d);
+  if (c.width!==cw||c.height!==ch){ c.width=cw; c.height=ch; tp.dirty=true; }
+  var ctx=tp.ctx;
+  ctx.font=(tp.fontPx*d)+"px "+'"SF Mono",ui-monospace,Consolas,monospace';
+  ctx.textBaseline="middle";
+  if (tp.dirty) tapeMeasure(tp,ctx);
+  tp.off+=tp.speed*d*dt;
+  if (tp.off>=tp.w){                               // seam: safe point to take new content
+    tp.off-=tp.w;
+    if (tp.pending){ tp.runs=tp.pending; tp.pending=null; tapeMeasure(tp,ctx);
+      if (tp.off>=tp.w) tp.off%=tp.w; }
+  }
+  ctx.clearRect(0,0,cw,ch);
+  var y=ch/2, x=-tp.off, guard=0;
+  while (x<cw && guard++<40){                      // repeat the cycle across the window
+    for (var k2=0;k2<tp.runs.length;k2++){
+      var rw=tp.widths[k2];
+      if (x+rw>0 && x<cw){ ctx.fillStyle=tp.runs[k2].col; ctx.fillText(tp.runs[k2].t,x,y); }
+      x+=rw;
+    }
+  }
+}
+function runsFrom(items){                          // items: [text, colorKey] pairs
+  var runs=[];
+  items.forEach(function(it){
+    runs.push({t:it[0],col:TAPE_COL[it[1]]||TAPE_COL.dim});
+    runs.push({t:"  ◆  ",col:TAPE_COL.sep});
+  });
+  return runs;
+}
+var TAPES={ gauge: mkTape(document.getElementById("gtickc"),10,26) };
+function tickMarquees(dt){ for (var key in TAPES) tapeDraw(TAPES[key],dt); }
 
 /* ============ quadrant lattice: 4 quadrants × 4 subcells, ~1k voxels ============ */
 var quad=document.getElementById("quad");
 var QLB=["THERMAL","KINETIC","EM","PAYLOAD"], QKEY=["TH","KN","EM","PL"];
+var QUAD_SUBCATS={
+  TH:["FLARE","BURN","BLOOM","ASH"],
+  KN:["YIELD","BLAST","SPREAD","PRECISION"],
+  EM:["PULSE","LANCE","COHERE","STATIC"],
+  PL:["DROP","RIG","CYCLE","READY"]
+};
+var QLABEL_EL={TH:"qlTH", KN:"qlKN", EM:"qlEM", PL:"qlPL"};
+function updateQuadLabels(){
+  var q=quads();
+  QKEY.forEach(function(key,qi){
+    var el=document.getElementById(QLABEL_EL[key]);
+    el.innerHTML="<b>"+QLB[qi]+" "+Math.round(q[key]*100)+"</b>"
+      +"<span class=\"sc\">"+QUAD_SUBCATS[key].join(" / ")+"</span>";
+  });
+}
+function lerpCol(a,b,t){
+  return [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t];
+}
+/* structured lattice, wireframe layout: each quadrant is a 2×2 arrangement of
+   its 4 subcategory cells (Q:1 top-left, Q:2 top-right, Q:3 bottom-left, Q:4
+   bottom-right — QUAD_SUBCATS order). Each cell is a dense block of square
+   1:1 bits whose dithered saturation reads that subcategory's stat. Quadrant
+   keeps the canvas's aspect ratio; the bit grid fills each cell. Labels are
+   DOM elements (updateQuadLabels()). */
+function subVals(qi){
+  // the 4 subcategory readings for a quadrant: its saturation shaded by the
+  // same per-slot factors the old subcell character used (pow/eff/calm/vol)
+  var q=quads(), m=metrics(), sat=q[QKEY[qi]];
+  var f=[m.pow, m.eff, 1-m.vol, m.vol];
+  return f.map(function(fx,si){
+    return clamp(sat*0.65 + fx*0.35 + (hash2(qi*7+si,3)-0.5)*0.08);
+  });
+}
 function drawQuad(){
   var d=window.devicePixelRatio||1, r=quad.getBoundingClientRect();
   if (!r.width) return;
@@ -260,32 +375,70 @@ function drawQuad(){
   if (quad.width!==W||quad.height!==H){ quad.width=W; quad.height=H; }
   var ctx=quad.getContext("2d");
   ctx.clearRect(0,0,W,H);
-  var q=quads(), m=metrics();
-  var pad=6*d, qw=(W-pad*3)/2, qh=(H-pad*3)/2;
-  var SUB=12;                                    // 12×12 voxels per subcell ×16 = 2304
+  var cur=currentRecipe(), curNeed=(cur.need||[]).map(function(nd){return nd[0];});
+  var curScore=evalRecipe(cur).score;
+  var tealActive = curScore>=0.85 && curScore<0.999;
+  var pulse=0.5+0.5*Math.sin(performance.now()/300);
+  var qw=W/2, qh=H/2;
+  var sw=qw/2, sh=qh/2;                           // subcategory cell, 2×2 per quadrant
+  // square 1:1 bits sized so the grid fills the cell densely
+  var bit=Math.max(3*d, Math.floor(Math.min(sw,sh)/9));
+  var nx=Math.floor(sw/bit), ny=Math.floor(sh/bit);
+  var g=Math.max(1,1*d), bsz=Math.max(1,bit-g*2);
   for (var qi=0;qi<4;qi++){
-    var qx=pad+(qi%2)*(qw+pad), qy=pad+((qi/2)|0)*(qh+pad);
-    var sat=q[QKEY[qi]];
-    ctx.strokeStyle="#34343c"; ctx.lineWidth=Math.max(1,d);
-    ctx.strokeRect(qx,qy,qw,qh);
-    for (var sc=0;sc<4;sc++){
-      var sx=qx+(sc%2)*qw/2, sy=qy+((sc/2)|0)*qh/2;
-      // subcell density: quadrant saturation with a per-cell character
-      var dens=clamp(sat + (hash2(qi*7+sc,3)-0.5)*0.25
-                     + (sc===0?m.pow:sc===1?m.eff:sc===2?(1-m.vol):m.vol)*0.15 - 0.08);
-      var cw2=qw/2/SUB, ch2=qh/2/SUB;
-      for (var iy=0;iy<SUB;iy++) for (var ix=0;ix<SUB;ix++){
-        var on=hash2(qi*131+sc*17+ix,iy)<dens;
-        var hot=dens>0.75, cold=dens<0.3;
-        var col=hot?[216,255,61]:cold?[122,120,106]:[255,182,61];
-        ctx.fillStyle="rgba("+col[0]+","+col[1]+","+col[2]+","+(on?0.28+dens*0.55:0.06)+")";
-        var sz=Math.min(cw2,ch2)*(on?0.88:0.42);
-        ctx.fillRect(sx+ix*cw2+(cw2-sz)/2, sy+iy*ch2+(ch2-sz)/2, sz, sz);
+    var qx=(qi%2)*qw, qy=((qi/2)|0)*qh, key=QKEY[qi];
+    var tealW = tealActive && curNeed.indexOf(key)>=0 ? 1 : 0;
+    var navyW = discoveryRecipe && discoveryRecipe.need.some(function(nd){return nd[0]===key;}) ? 1 : 0;
+    var pulseA = navyW>0 ? (0.55+0.45*pulse) : 1;
+    var sv=subVals(qi);
+    for (var sc=0;sc<4;sc++){                     // Q:1 tl, Q:2 tr, Q:3 bl, Q:4 br
+      var v=sv[sc];
+      var sx0=qx+(sc%2)*sw+(sw-nx*bit)/2;
+      var sy0=qy+((sc/2)|0)*sh+(sh-ny*bit)/2;
+      var hot=v>0.62, cold=v<0.28;
+      var base = hot?[216,255,61]:cold?[122,120,106]:[255,182,61];
+      var col=lerpCol(lerpCol(base,[61,216,200],tealW),[61,110,216],navyW);
+      for (var by=0;by<ny;by++) for (var bx=0;bx<nx;bx++){
+        var on=hash2(qi*131+sc*17+bx,by)<v*1.08;  // dithered saturation = the reading
+        var dith=(hash2(bx,qi*7+sc*3+by)-0.5)*0.10;
+        var alpha=Math.max(0.04,(on?0.34+v*0.52:0.07)+dith)*pulseA;
+        ctx.fillStyle="rgba("+(col[0]|0)+","+(col[1]|0)+","+(col[2]|0)+","+alpha+")";
+        ctx.fillRect(sx0+bx*bit+g, sy0+by*bit+g, bsz, bsz);
       }
     }
-    ctx.fillStyle="#8a8778"; ctx.font=(7*d)+"px monospace"; ctx.textAlign="left";
-    ctx.fillText(QLB[qi]+" "+Math.round(sat*100), qx+4*d, qy+9*d);
   }
+}
+
+/* ============ ambient scans: teal near-ultimate, navy discovery-imminent ============ */
+var discoveryRecipe=null, discoveryScore=0;
+function scanAmbient(){
+  var q=quads(), best=null, bestScore=0;
+  RECIPES.forEach(function(r){
+    if (r.kind!=="unlock" || P.unlocks[r.id]) return;
+    var e=evalRecipe(r);
+    if (e.score>bestScore){ bestScore=e.score; best=r; }
+  });
+  discoveryRecipe = (best && bestScore>=0.92) ? best : null;
+  discoveryScore = bestScore;
+}
+function nearestSubcat(){
+  var q=quads(), m=metrics(), topKey=QKEY[0], topVal=-1;
+  QKEY.forEach(function(k){ if (q[k]>topVal){ topVal=q[k]; topKey=k; } });
+  var factors=[m.pow,m.eff,1-m.vol,m.vol], topSc=0, topF=-1;
+  factors.forEach(function(f,i){ if (f>topF){ topF=f; topSc=i; } });
+  return { quad:topKey, name:QUAD_SUBCATS[topKey][topSc] };
+}
+function updateGaugeTape(){
+  var m=metrics(), cur=currentRecipe(), curE=evalRecipe(cur), ns=nearestSubcat();
+  var items=[
+    ["EFF "+Math.round(m.eff*100), "ink"],
+    ["POW "+Math.round(m.pow*100), "ink"],
+    ["VOL "+Math.round(m.vol*100), "ink"],
+    ["MATCH "+Math.round(curE.score*100)+"%", curE.score>=0.999?"up":"dim"],
+    [ns.quad+" — "+ns.name+" reads hot", "rq"]
+  ];
+  if (discoveryRecipe) items.push([discoveryRecipe.name+" reads hot — PROBE to seize it","bad"]);
+  tapeSet(TAPES.gauge, runsFrom(items));
 }
 
 /* ============ readouts ============ */
@@ -294,12 +447,20 @@ function fmtNeed(nd){
              KN:"kinetic lattice",EM:"EM lattice",PL:"payload lattice"};
   return names[nd[0]]||nd[0];
 }
-function render(){
+function renderVisual(dt){
   var m=metrics();
+  scanAmbient();
   drawGauge(document.getElementById("g0"),m.eff,false);
   drawGauge(document.getElementById("g1"),m.pow,false);
   drawGauge(document.getElementById("g2"),m.vol,true);
   drawQuad();
+  tickMarquees(dt);
+}
+function renderStatic(){
+  var m=metrics();
+  scanAmbient();
+  updateGaugeTape();
+  updateQuadLabels();
   for (var k=0;k<3;k++) document.getElementById("v"+k).textContent=Math.round(SL[k]*100);
   var cur=currentRecipe(), curE=evalRecipe(cur);
   // stats card — reads the SELECTED weapon's build against its own target
@@ -326,6 +487,22 @@ function render(){
   var already = cur.kind==="unlock" && P.unlocks[cur.id];
   document.getElementById("btnD").disabled=!(viable&&!already);
 }
+/* every commit/discovery grows the weapon's tech tree: a node keeps the build,
+   the metrics snapshot, its dominant axis, and parents to the nearest earlier
+   node in slider space — branching happens when you commit from a different
+   corner of the lattice than before. arsenal.html renders this. */
+function treeCommit(id){
+  var m=metrics();
+  var nodes=P.tree[id]=(P.tree[id]||[]);
+  var axis=["POW","EFF","VOL"][[m.pow,m.eff,m.vol].indexOf(Math.max(m.pow,m.eff,m.vol))];
+  var parent=-1, bestD=1e9;
+  nodes.forEach(function(n,i){
+    var dd=Math.pow(n.sl[0]-SL[0],2)+Math.pow(n.sl[1]-SL[1],2)+Math.pow(n.sl[2]-SL[2],2);
+    if (dd<bestD){ bestD=dd; parent=i; }
+  });
+  nodes.push({ sl:SL.slice(), eff:Math.round(m.eff*100)/100, pow:Math.round(m.pow*100)/100,
+               vol:Math.round(m.vol*100)/100, axis:axis, parent:parent, sortie:P.sorties||0 });
+}
 document.getElementById("loadlist").addEventListener("click",function(e){
   var b=e.target.closest?e.target.closest(".li"):null;
   if (!b) return;
@@ -334,6 +511,16 @@ document.getElementById("loadlist").addEventListener("click",function(e){
 
 /* ============ testbed — always reads against the SELECTED weapon's target ============ */
 document.getElementById("btnC").addEventListener("click",function(){
+  if (discoveryRecipe){
+    var dr=discoveryRecipe, m=metrics();
+    P.unlocks[dr.id]={ pow:Math.round(m.pow*100)/100, eff:Math.round(m.eff*100)/100,
+                        vol:Math.round(m.vol*100)/100 };
+    treeCommit(dr.id);
+    saveP();
+    selectArsenal(dr.id);
+    document.getElementById("hint").innerHTML="<b>"+dr.name+"</b> discovered — deployable next sortie";
+    return;
+  }
   var r=currentRecipe(), e=evalRecipe(r), h;
   if (e.score>=0.999) h="<b>"+r.name+"</b> reads viable — commit on D";
   else if (e.score>0.6) h="<b>"+r.name+"</b> at "+Math.round(e.score*100)+"% — "+fmtNeed(e.missing)
@@ -357,7 +544,8 @@ btnD.addEventListener("click",function(){
                       vol:Math.round(m.vol*100)/100 };
     document.getElementById("hint").innerHTML="<b>"+r.name+"</b> prototyped — deployable next sortie";
   }
-  saveP(); render();
+  treeCommit(r.id);
+  saveP(); renderStatic();
 });
 setInterval(function(){ if (armT>0){ armT-=0.1;
   if (armT<=0){ btnD.classList.remove("armed"); btnD.children[1].textContent="RUN PROTOTYPE"; } } },100);
@@ -370,7 +558,7 @@ setInterval(function(){ if (armT>0){ armT-=0.1;
     P.builds[selectedId]=SL.slice(); saveP();
     this.classList.add("snap"); snapT=1;
     if (navigator.vibrate) navigator.vibrate(4);
-    render();
+    renderStatic();
   });
   setInterval(function(){ if (snapT>0){ snapT-=0.1; if (snapT<=0) el.classList.remove("snap"); } },50);
 });
@@ -378,15 +566,27 @@ document.getElementById("breset").addEventListener("click",function(){
   SL=[0.5,0.5,0.3];
   P.builds[selectedId]=SL.slice(); saveP();
   [0,1,2].forEach(function(k){ document.getElementById("s"+k).value=SL[k]*100; });
-  render();
+  renderStatic();
 });
 document.getElementById("bcommand").addEventListener("click",function(){
   location.href="index.html";
 });
+document.getElementById("barsenal").addEventListener("click",function(){
+  location.href="arsenal.html";
+});
 
 loadBuild(selectedId);
-render();
-window.addEventListener("resize",render);
+renderStatic();
+window.addEventListener("resize",renderStatic);
+
+/* ================= loop ================= */
+var last=performance.now();
+function loop(now){
+  var dt=Math.min(0.1,(now-last)/1000); last=now;
+  renderVisual(dt);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
 </script>
 </body>
 </html>
