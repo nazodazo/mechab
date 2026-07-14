@@ -250,11 +250,23 @@ var P=(function(){
        if (p && p.v===1) return p; }catch(e){}
   return {v:1, sorties:0, wins:0, verdicts:[], crew:null};
 })();
+if (!P.arsenal) P.arsenal={};
+if (!P.unlocks) P.unlocks={};
 function saveProfile(){ try{ localStorage.setItem("warclock_profile",JSON.stringify(P)); }catch(e){} }
 /* arsenal calibration from the bench: fit 0..1 scales weapon performance.
    uncalibrated ordnance still works — the bench makes it BETTER, never gates it. */
 function arsFit(id){ return (P.arsenal&&P.arsenal[id])?P.arsenal[id].fit:0; }
 function arsMk(id){ return P.arsenal&&P.arsenal[id]?"MK "+(1+Math.round(P.arsenal[id].fit*3)):"MK 1"; }
+/* bench prototypes populate the strike slot: best unlocked+affordable wins */
+function pickStrike(){
+  var u=P.unlocks||{};
+  if (S.mat>=3) return {k:"ORBITAL", cost:3, label:"ORBITAL", info:arsMk("ORBITAL")+" calibration"};
+  if (u.CLUSTER && S.mat>=2) return {k:"CLUSTER", cost:2, label:"CLUSTER TMHK", info:"3 warheads · bench prototype"};
+  if (u.FIRESTORM && S.mat>=2) return {k:"FIRESTORM", cost:2, label:"FIRESTORM", info:"rolling barrage · bench prototype"};
+  if (u.EMP && S.mat>=1) return {k:"EMP", cost:1, label:"EMP LANCE", info:"systems kill · no casualties"};
+  if (S.mat>=1) return {k:"TOMAHAWK", cost:1, label:"TOMAHAWK", info:arsMk("TOMAHAWK")+" calibration"};
+  return null;
+}
 var MEDALS={ LONE:{ic:"◈",name:"sole survivor on completion"},
   IRON:{ic:"✚",name:"survived 2+ casualties"},
   DA:{ic:"▲",name:"sabotage completed"}, SR:{ic:"◆",name:"espionage completed"},
@@ -688,14 +700,53 @@ function fireLAOE(kind){
     S.mon={kind:"KIN",label:"TOMAHAWK",t:0,dur:4, at:4*0.85, fx:function(){
       strike(tgt.x,tgt.y,10*(0.85+arsFit("TOMAHAWK")*0.3),0.7*(0.8+arsFit("TOMAHAWK")*0.4));
       tick("TOMAHAWK impact — terrain cratered","up",true); }};
-  } else {
+  } else if (kind==="ORBITAL"){
     tick("ORBITAL LANCE firing — stand by","rq",true); mark("ORB",true);
     S.receipts.push("◈ ORBITAL strike (3 MAT)");
     S.mon={kind:"KIN",label:"ORBITAL LANCE",t:0,dur:4.5, at:4.5*0.85, fx:function(){
       strike(tgt.x,tgt.y,16*(0.85+arsFit("ORBITAL")*0.3),0.9*(0.8+arsFit("ORBITAL")*0.4));
       tick("ORBITAL LANCE — the map remembers this","up",true); }};
+  } else if (kind==="CLUSTER"){
+    var cst=P.unlocks.CLUSTER||{pow:0.5,eff:0.5};
+    tick("CLUSTER TOMAHAWK away — 3 warheads separating","rq",true); mark("TMH",true);
+    S.receipts.push("◈ CLUSTER strike (2 MAT) — bench prototype");
+    S.mon={kind:"KIN",label:"CLUSTER TMHK",t:0,dur:4.2, at:4.2*0.85, fx:function(){
+      var off=[[0,0],[6,3],[-6,4]];
+      off.forEach(function(o){ strike(tgt.x+o[0],tgt.y+o[1],6+cst.pow*3,0.5+cst.eff*0.3); });
+      tick("CLUSTER TOMAHAWK — warheads down across the cell","up",true); }};
+  } else if (kind==="EMP"){
+    var est=P.unlocks.EMP||{pow:0.5,eff:0.5};
+    var rad=12+est.pow*6;
+    tick("EMP LANCE firing — systems kill, no casualties","rq",true); mark("ORB",true);
+    S.receipts.push("◈ EMP strike (1 MAT) — bench prototype");
+    S.mon={kind:"KIN",label:"EMP LANCE",t:0,dur:3.8, at:3.8*0.85, fx:function(){
+      addFx(tgt.x,tgt.y,rad,"strike");
+      for (var y=Math.max(0,tgt.y-rad|0);y<Math.min(GH,tgt.y+rad);y++)
+        for (var x=Math.max(0,tgt.x-rad|0);x<Math.min(GW,tgt.x+rad);x++){
+          var dd=Math.hypot(x-tgt.x,y-tgt.y); if (dd>rad) continue;
+          var i=y*GW+x; if (S.terr[i]) continue;
+          S.c[i]*=0.05*(1-est.eff*0.3);
+          S.scorch[i]=Math.min(0.4,S.scorch[i]+0.15*(1-dd/rad));
+        }
+      contourDirty=true;
+      S.forts.forEach(function(f10){ if (Math.hypot(f10.x-tgt.x,f10.y-tgt.y)<rad+f10.r*0.5) f10.hp-=4; });
+      tick("EMP LANCE — grid square neutralized, no kills","up",true); }};
+  } else if (kind==="FIRESTORM"){
+    var fst=P.unlocks.FIRESTORM||{pow:0.5,eff:0.5};
+    tick("FIRESTORM BARRAGE keyed — rolling fire incoming","rq",true); mark("TMH",true);
+    S.receipts.push("◈ FIRESTORM barrage (2 MAT) — bench prototype");
+    S.barrage={x:tgt.x,y:tgt.y,left:4,timer:0,rad:5+fst.pow*3,amt:0.45+fst.eff*0.3};
   }
   return true;
+}
+function barrageTick(dt){
+  var b=S.barrage; if (!b) return;
+  b.timer-=dt;
+  if (b.timer<=0 && b.left>0){
+    strike(b.x+(Math.random()-0.5)*6,b.y+(Math.random()-0.5)*6,b.rad,b.amt);
+    b.left--; b.timer=0.7;
+    if (b.left<=0){ S.barrage=null; tick("FIRESTORM BARRAGE — spent","up",true); }
+  }
 }
 
 /* ================= warclock ================= */
@@ -709,6 +760,7 @@ function advance(dt){
   for (var k=0;k<S.troops.length;k++) troopTick(S.troops[k],dt);
   S.squads.forEach(function(sq){ squadTick(sq,dt); });
   mechaTick(dt);
+  barrageTick(dt);
   if (S.cue){ S.cue.left-=dt; if (S.cue.left<=0){ S.cue.no(S.cue.sq); S.cue=null; } }
   if (S.mon){ S.mon.t+=dt;
     if (S.mon.fx && !S.mon.fired && S.mon.t>=S.mon.at){ S.mon.fired=true; S.mon.fx(); }
@@ -1255,10 +1307,10 @@ function renderTickers(){
   tkSet(1,[["141 "+(q.urge?"URGED":"steady"),q.urge?"up":"ink"],[(q.phase==="WORK"?q.op.name:q.phase),"dim"]],
           q.urge?"up":false, crew+"/4");
 
-  var ck = S.mat>=3?[["ORBITAL LANCE keyed","up"],[arsMk("ORBITAL")+" calibration","dim"]]
-         : S.mat>=1?[["TOMAHAWK keyed","up"],[arsMk("TOMAHAWK")+" calibration","dim"]]
+  var pst=pickStrike();
+  var ck = pst?[[pst.label+" keyed","up"],[pst.info,"dim"]]
          : [["no strike keys","dim"],["earn MAT via espionage/uplink ops","dim"]];
-  tkSet(2,ck, S.mat>=1?"up":false, S.mat+" MAT");
+  tkSet(2,ck, pst?"up":false, S.mat+" MAT");
 
   var mk = S.mechaUnit?[["MECHA fielded","up"],["holding ground taken","dim"]]
          : S.mechaCd>0?[["mecha cooling","dim"]]
@@ -1326,11 +1378,10 @@ var BTN=[
     tog:function(){ return me().urge; }, can:function(){ return me().hp>0; },
     fire:function(){ me().urge=!me().urge;
       tick(me().urge?"you: push. 141: pushing":"you: steady. 141: copy","team"); } },
-  { slot:"C", label:function(){ return S.mat>=3?"ORBITAL":"TOMAHAWK"; },
-    cost:function(){ return S.mat>=3?"−3 MAT":S.mat>=1?"−1 MAT":"needs MAT"; },
-    can:function(){ return S.mat>=1; },
-    fire:function(){ if (S.mat>=3){ if (fireLAOE("ORBITAL")) S.mat-=3; }
-                     else { if (fireLAOE("TOMAHAWK")) S.mat-=1; } } },
+  { slot:"C", label:function(){ var st=pickStrike(); return st?st.label:"NO STRIKE"; },
+    cost:function(){ var st=pickStrike(); return st?"−"+st.cost+" MAT":"needs MAT"; },
+    can:function(){ return !!pickStrike(); },
+    fire:function(){ var st=pickStrike(); if (st && fireLAOE(st.k)) S.mat-=st.cost; } },
   { slot:"D", label:function(){ return S.mechaUnit?"FIELDED":"MECHA"; },
     cost:function(){ return S.mechaCd>0?"cool "+(S.mechaCd|0)+"s":"−250 req"; },
     can:function(){ return !S.mechaUnit && S.mechaCd<=0 && S.req>=250; },

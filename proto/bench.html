@@ -5,9 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
 <title>WARCLOCK // ARSENAL BENCH</title>
 <style>
-/* Arsenal bench v2 — frequency-mixing tuner. Each weapon has a target spectrum
-   (its formula); you shape a mix of oscillator channels to match it. Fit rating
-   burns into the shared profile, and the theatre reads it as real weapon stats. */
+/* Arsenal bench v3 — permutation lab. Three sliders drive a formula space:
+   three radial saturation gauges (EFF/POW/VOL, ~500 voxels) and a 4-quadrant
+   lattice map (~1k voxels). Certain map shapes are weapon recipes — TEST (C)
+   hints at what's near, COMMIT (D) burns a viable build into the profile as
+   deployable arsenal. The theatre reads all of it. */
 :root{
   --bg:#17171b; --panel:#1e1e24; --ink:#e8e4d8; --dim:#8a8778; --line:#34343c;
   --us:#d8ff3d; --foe:#ff5a2a; --amber:#ffb63d;
@@ -19,95 +21,104 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
   font-family:var(--mono);font-size:12px;line-height:1.35;
   -webkit-user-select:none;user-select:none;overscroll-behavior:none;display:flex;justify-content:center}
 @supports (height:100dvh){ html,body{height:100dvh} }
-#device{width:100%;max-width:460px;height:100%;overflow:hidden;display:flex;flex-direction:column;gap:8px;
+#device{width:100%;max-width:460px;height:100%;overflow:hidden;display:flex;flex-direction:column;gap:7px;
   padding:calc(8px + env(safe-area-inset-top)) 10px calc(10px + env(safe-area-inset-bottom))}
 .card{border:1px solid var(--line);background:var(--panel);border-radius:5px;
   display:flex;flex-direction:column;overflow:hidden}
-.card>.ph{flex:none;padding:6px 10px 3px;font-size:9px;letter-spacing:.18em;color:var(--dim)}
+.card>.ph{flex:none;padding:5px 10px 2px;font-size:9px;letter-spacing:.18em;color:var(--dim)}
 
-#top{display:flex;gap:8px;align-items:baseline;padding:0 2px;color:var(--dim);font-size:11px;letter-spacing:.08em}
-#top b{color:var(--ink);font-weight:400}
-#top .link{margin-left:auto;font-size:10px}
+/* top: infomatics + controls */
+#top{flex:none;display:flex;gap:7px}
+#info{flex:1;min-width:0;padding:6px 10px}
+#info b{color:var(--ink);font-weight:400;font-size:12px}
+#info .d{font-size:10px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#ctrl{width:32%;flex:none;padding:6px 8px;display:flex;flex-direction:column;gap:3px;align-items:stretch}
+#ctrl button{background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:3px;
+  font-family:var(--mono);font-size:10px;letter-spacing:.06em;padding:3px 6px;touch-action:manipulation}
+#ctrl button:active{background:var(--ink);color:var(--bg)}
 
-/* weapon select: one card per arsenal item */
-#weapons{flex:none;display:flex;gap:6px}
-.wpn{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:5px;color:var(--ink);
-  font-family:var(--mono);font-size:11px;letter-spacing:.04em;padding:7px 8px;text-align:left;
-  display:flex;flex-direction:column;gap:2px;touch-action:manipulation}
-.wpn .k{font-size:9px;color:var(--dim);letter-spacing:.14em}
-.wpn .mk{font-size:10px;color:var(--dim)}
-.wpn.on{border-color:var(--us)} .wpn.on .k{color:var(--us)}
+/* gauges: three radial voxel saturation dials */
+#gaugerow{flex:0.85;min-height:0;display:flex;gap:7px}
+.gcard{flex:1;min-width:0;padding:0 4px 4px}
+.gcard canvas{width:100%;height:100%;display:block}
 
-/* the three cluster gauges: dense voxel matrices, ~2k dots, gradient fill */
-#gaugewrap{flex:0.9;min-height:0;padding:0 8px 8px}
-#gauges{width:100%;height:100%;display:block}
-/* spectral display: the high-resolution mix vs target */
-#specwrap{flex:1;min-height:0;padding:0 8px 8px}
-#spec{width:100%;height:100%;display:block}
+/* quadrant lattice */
+#quadwrap{flex:1.5;min-height:0;padding:0 6px 6px}
+#quad{width:100%;height:100%;display:block}
 
-/* mixer: 4 oscillator channel cards */
-#mixer{flex:1.4;min-height:0;display:flex;flex-direction:column;gap:6px;overflow-y:auto;
-  -webkit-overflow-scrolling:touch;overscroll-behavior:contain;scrollbar-width:none}
-#mixer::-webkit-scrollbar{display:none}
-.ch{flex:none;border:1px solid var(--line);background:var(--panel);border-radius:5px;padding:6px 9px;
-  display:grid;grid-template-columns:34px 1fr 1fr 1fr;gap:8px;align-items:center}
-.ch .nm{font-size:11px;letter-spacing:.1em;color:var(--us)}
-.ch.mute .nm{color:var(--line)}
-.param{display:flex;flex-direction:column;gap:2px;min-width:0}
-.param .pk{font-size:8px;color:var(--dim);letter-spacing:.14em}
-.param .row{display:flex;align-items:center;gap:4px}
-.param button{width:26px;height:24px;background:var(--bg);border:1px solid var(--line);color:var(--ink);
-  font-family:var(--mono);font-size:13px;border-radius:3px;touch-action:manipulation;flex:none}
-.param button:active{background:var(--ink);color:var(--bg)}
-.param .pv{flex:1;text-align:center;font-size:11px;font-variant-numeric:tabular-nums}
+/* hint ticker */
+#hint{flex:none;border:1px solid var(--line);background:var(--bg);border-radius:4px;
+  padding:4px 10px;font-size:10px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#hint b{color:var(--amber);font-weight:400}
 
-/* commit row */
-#commit{flex:none;display:flex;gap:8px;align-items:stretch}
-#fit{width:38%;flex:none;border:1px solid var(--line);background:var(--panel);border-radius:5px;
-  padding:6px 10px;display:flex;flex-direction:column;justify-content:center}
-#fit .k{font-size:9px;color:var(--dim);letter-spacing:.14em}
-#fit .v{font-size:20px;font-variant-numeric:tabular-nums}
-#burn{flex:1;background:var(--panel);border:1px solid var(--us);color:var(--us);border-radius:5px;
-  font-family:var(--mono);font-size:13px;letter-spacing:.1em;touch-action:manipulation}
-#burn:active{background:var(--us);color:var(--bg)}
-#burn.armed{border-color:var(--amber);color:var(--amber)}
-#burn[disabled]{opacity:.3}
-#note{flex:none;font-size:10px;color:var(--dim);padding:0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* bottom: loadout+stats left, sliders+testbed right */
+#bottom{flex:1.5;min-height:0;display:flex;gap:7px}
+#leftcol{width:40%;flex:none;display:flex;flex-direction:column;gap:7px;min-height:0}
+#loadout{flex:1;min-height:0;overflow:hidden}
+#loadout .li{font-size:10px;padding:1px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--dim)}
+#loadout .li b{color:var(--us);font-weight:400}
+#stats{flex:1;min-height:0}
+#stats .lrow{display:flex;justify-content:space-between;font-size:10px;color:var(--dim);padding:1px 10px}
+#stats .lrow b{color:var(--ink);font-weight:400}
+#rightcol{flex:1;min-width:0;display:flex;flex-direction:column;gap:7px}
+.sld{flex:none;border:1px solid var(--line);background:var(--panel);border-radius:4px;padding:5px 10px 7px}
+.sld .sk{font-size:9px;color:var(--dim);letter-spacing:.14em;display:flex;justify-content:space-between}
+.sld input{width:100%;margin-top:4px;-webkit-appearance:none;appearance:none;height:4px;border-radius:2px;
+  background:var(--line);outline:none}
+.sld input::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:22px;height:22px;border-radius:4px;
+  background:var(--bg);border:1px solid var(--ink);cursor:pointer}
+#testbed{flex:1;min-height:0;display:flex;gap:7px}
+#testbed button{flex:1;border-radius:5px;font-family:var(--mono);letter-spacing:.06em;font-size:12px;
+  background:var(--panel);border:1px solid var(--line);color:var(--ink);touch-action:manipulation;
+  display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;padding:8px 10px}
+#testbed button .k{font-size:9px;color:var(--dim);letter-spacing:.16em}
+#testbed button:active{background:var(--ink);color:var(--bg)}
+#btnC{border-color:var(--amber)} #btnC .k{color:var(--amber)}
+#btnD{border-color:var(--us)} #btnD .k{color:var(--us)}
+#btnD[disabled]{opacity:.35}
+#btnD.armed{border-color:var(--amber);color:var(--amber)}
 </style>
 </head>
 <body>
 <main id="device">
-  <div id="top"><b>ARSENAL BENCH</b><span>frequency lab</span><span class="link" id="proflink">—</span></div>
-  <div id="weapons">
-    <button class="wpn" id="w0"></button><button class="wpn" id="w1"></button><button class="wpn" id="w2"></button>
+  <div id="top">
+    <div class="card" id="info"><span class="ph">ARSENAL INFOMATICS</span>
+      <div id="infoline"><b>—</b></div><div class="d" id="infodesc">—</div></div>
+    <div class="card" id="ctrl"><span class="ph">CONTROLS</span>
+      <button id="breset">RESET SLIDERS</button><button id="bprof">—</button></div>
   </div>
-  <div class="card" id="gaugewrap"><span class="ph">BAND GAUGES — LOW / MID / HIGH cluster fit</span><canvas id="gauges"></canvas></div>
-  <div class="card" id="specwrap"><span class="ph">SPECTRUM — shape the mix onto the target curve</span><canvas id="spec"></canvas></div>
-  <div id="mixer"></div>
-  <div id="commit">
-    <div id="fit"><span class="k">FIT</span><span class="v" id="fitv">0%</span></div>
-    <button id="burn">BURN-IN CALIBRATION</button>
+  <div id="gaugerow">
+    <div class="card gcard"><span class="ph">EFF</span><canvas id="g0"></canvas></div>
+    <div class="card gcard"><span class="ph">POW</span><canvas id="g1"></canvas></div>
+    <div class="card gcard"><span class="ph">VOL</span><canvas id="g2"></canvas></div>
   </div>
-  <div id="note">fit burns into the command profile — the theatre reads it as live weapon performance</div>
+  <div class="card" id="quadwrap"><span class="ph">LATTICE — THERMAL / KINETIC / EM / PAYLOAD</span><canvas id="quad"></canvas></div>
+  <div id="hint">bench idle — move the sliders, TEST to read the lattice</div>
+  <div id="bottom">
+    <div id="leftcol">
+      <div class="card" id="loadout"><span class="ph">ARSENAL LOADOUT</span><div id="loadlist"></div></div>
+      <div class="card" id="stats"><span class="ph">ARSENAL STATS</span><div id="statlist"></div></div>
+    </div>
+    <div id="rightcol">
+      <div class="sld"><span class="sk"><span>CHARGE</span><span id="v0">50</span></span>
+        <input type="range" id="s0" min="0" max="100" value="50"></div>
+      <div class="sld"><span class="sk"><span>FOCUS</span><span id="v1">50</span></span>
+        <input type="range" id="s1" min="0" max="100" value="50"></div>
+      <div class="sld"><span class="sk"><span>MODULATION</span><span id="v2">30</span></span>
+        <input type="range" id="s2" min="0" max="100" value="30"></div>
+      <div id="testbed">
+        <button id="btnC"><span class="k">C · TEST</span><span>PROBE LATTICE</span></button>
+        <button id="btnD" disabled><span class="k">D · COMMIT</span><span>RUN PROTOTYPE</span></button>
+      </div>
+    </div>
+  </div>
 </main>
 
 <script>
 "use strict";
-var BINS=48;
-/* each weapon's formula is a fixed target spectrum: peaks it wants hit.
-   deterministic per weapon — the puzzle is legible and learnable. */
-function gauss(x,mu,sg){ var z=(x-mu)/sg; return Math.exp(-z*z/2); }
-var WEAPONS=[
-  {id:"TOMAHAWK", name:"TOMAHAWK", desc:"cruise airframe",
-   tgt:function(b){ var x=b/BINS;
-     return gauss(x,0.22,0.06)*0.9 + gauss(x,0.62,0.09)*0.7; }},
-  {id:"ORBITAL",  name:"ORBITAL LANCE", desc:"beam coherence",
-   tgt:function(b){ var x=b/BINS;
-     return gauss(x,0.15,0.04)*0.8 + gauss(x,0.5,0.05)*1.0 + gauss(x,0.85,0.06)*0.6; }},
-  {id:"MECHA",    name:"MECHA DROP", desc:"chassis resonance",
-   tgt:function(b){ var x=b/BINS;
-     return gauss(x,0.35,0.16)*0.85 + gauss(x,0.78,0.05)*0.5; }},
-];
+function clamp(v){ return v<0?0:v>1?1:v; }
+function hash2(a,b){ var h=(a*374761393+b*668265263)^(a<<7); h=(h^(h>>13))*1274126177;
+  return ((h^(h>>16))>>>0)/4294967295; }
 
 /* shared profile — same key the theatre uses */
 var P=(function(){
@@ -116,172 +127,226 @@ var P=(function(){
   return {v:1, sorties:0, wins:0, verdicts:[], crew:null};
 })();
 if (!P.arsenal) P.arsenal={};
+if (!P.unlocks) P.unlocks={};
 function saveP(){ try{ localStorage.setItem("warclock_profile",JSON.stringify(P)); }catch(e){} }
 
-/* mixer state: 4 oscillator channels. FREQ/WIDTH/GAIN each stepped, not slid —
-   discrete moves keep it instrument-like and tunable by feel. */
-var cur=0, armT=0;
-var CH;
-function chDefault(){
-  return [ {f:0.25,w:0.08,g:0.5}, {f:0.5,w:0.08,g:0.5},
-           {f:0.75,w:0.08,g:0.0}, {f:0.4,w:0.16,g:0.0} ];
+/* ============ the formula space ============ */
+var SL=[0.5,0.5,0.3];    // CHARGE, FOCUS, MODULATION
+function metrics(){
+  var a=SL[0],b=SL[1],c=SL[2];
+  return {
+    eff: clamp(0.25 + b*0.55 - Math.abs(a-b)*0.5 - c*0.3),
+    pow: clamp(a*0.75 + c*0.45 - a*c*0.2),
+    vol: clamp(c*0.85 + a*b*0.25 - b*0.35),
+  };
 }
-function loadCh(){
-  var a=P.arsenal[WEAPONS[cur].id];
-  CH=(a&&a.ch)?a.ch.map(function(c){return {f:c.f,w:c.w,g:c.g};}):chDefault();
-}
-function mixAt(x){
-  var v=0;
-  for (var k=0;k<CH.length;k++) v+=gauss(x,CH[k].f,Math.max(0.02,CH[k].w))*CH[k].g;
-  return v;
-}
-function fit(){
-  var err=0,tot=0;
-  for (var b=0;b<BINS;b++){ var x=b/BINS, t=WEAPONS[cur].tgt(b), m=mixAt(x);
-    err+=Math.abs(m-t); tot+=t; }
-  return Math.max(0,1-err/tot);
+/* quadrant saturations: each favors a different mix of the three feeds */
+function quads(){
+  var a=SL[0],b=SL[1],c=SL[2];
+  return {
+    TH: clamp(a*0.8 + c*0.35 - b*0.25),          // thermal: charge-hungry
+    KN: clamp(a*0.45 + a*b*0.75 - c*0.2),        // kinetic: charge×focus
+    EM: clamp(b*0.7 + b*c*0.55 - a*0.25),        // EM: focus×modulation
+    PL: clamp(c*0.6 + a*c*0.55 - b*0.2),         // payload: modulation-fed
+  };
 }
 
-/* ============ render ============ */
-var spec=document.getElementById("spec"), sctx=spec.getContext("2d");
-function fitCanvas(c){ var r=c.getBoundingClientRect(), d=window.devicePixelRatio||1;
-  if (!r.width) return;
-  var w=Math.round(r.width*d), h=Math.round(r.height*d);
-  if (c.width!==w||c.height!==h){ c.width=w; c.height=h; } }
-function drawSpec(){
-  fitCanvas(spec);
-  var W=spec.width,H=spec.height,d=window.devicePixelRatio||1;
-  sctx.clearRect(0,0,W,H);
-  var pad=8*d, bw=(W-pad*2)/BINS, base=H-14*d, top=10*d, span=base-top;
-  var TOL=0.12;
-  for (var b=0;b<BINS;b++){
-    var x=b/BINS, t=WEAPONS[cur].tgt(b), m=mixAt(x);
-    var bx=pad+b*bw;
-    // current mix: the spectral bar. within tolerance = green, hot = red, cold = dim
-    var col = Math.abs(m-t)<=TOL ? "#d8ff3d" : m>t ? "#ff5a2a" : "#4a4a54";
-    var mh=Math.min(1.15,m)*span;
-    sctx.fillStyle=col;
-    sctx.fillRect(bx,base-mh,Math.max(1,bw*0.7),mh);
-    // target curve: ticks riding above the bars
-    var th=Math.min(1.15,t)*span;
-    sctx.fillStyle="rgba(232,228,216,.85)";
-    sctx.fillRect(bx,base-th-1.5*d,Math.max(1,bw*0.7),1.5*d);
-  }
-  sctx.strokeStyle="#34343c";
-  sctx.beginPath(); sctx.moveTo(pad,base); sctx.lineTo(W-pad,base); sctx.stroke();
-  // channel markers along the base
-  CH.forEach(function(c,k){
-    if (c.g<=0) return;
-    var cx=pad+c.f*(W-pad*2);
-    sctx.fillStyle="#ffb63d"; sctx.font=(8*d)+"px monospace"; sctx.textAlign="center";
-    sctx.fillText(String.fromCharCode(65+k),cx,base+10*d);
+/* ============ recipes: the permutation spine ============
+   upgrades tune the classic three; discoveries add NEW deployable LAOE.
+   need[] entries: [metricOrQuad, min, max]. viability = worst margin. */
+var RECIPES=[
+  {id:"TOMAHAWK", kind:"tune", name:"TOMAHAWK RE-TUNE", desc:"airframe calibration — sharper strike",
+   need:[["pow",0.45,1],["eff",0.55,1],["vol",0,0.5]]},
+  {id:"ORBITAL", kind:"tune", name:"ORBITAL COHERENCE", desc:"beam discipline — wider lance",
+   need:[["EM",0.55,1],["eff",0.6,1],["vol",0,0.35]]},
+  {id:"MECHA", kind:"tune", name:"CHASSIS RESONANCE", desc:"drop readiness — faster cycle",
+   need:[["PL",0.55,1],["pow",0.5,1],["vol",0,0.55]]},
+  {id:"CLUSTER", kind:"unlock", name:"CLUSTER TOMAHAWK", desc:"one bird, three warheads — 2 MAT",
+   need:[["KN",0.6,1],["PL",0.5,1],["vol",0.35,0.7]]},
+  {id:"EMP", kind:"unlock", name:"EMP LANCE", desc:"kills systems, not people — dismantles forts",
+   need:[["EM",0.65,1],["eff",0.6,1],["pow",0,0.55]]},
+  {id:"FIRESTORM", kind:"unlock", name:"FIRESTORM BARRAGE", desc:"rolling artillery — aggressive build",
+   need:[["TH",0.65,1],["vol",0.55,1]]},
+];
+function evalRecipe(r){
+  var m=metrics(), q=quads(), worst=1, missing=null;
+  r.need.forEach(function(nd){
+    var v=(nd[0] in m)?m[nd[0]]:q[nd[0]];
+    var margin;
+    if (v<nd[1]) margin=Math.max(0,1-(nd[1]-v)*3);
+    else if (v>nd[2]) margin=Math.max(0,1-(v-nd[2])*3);
+    else margin=1;
+    if (margin<worst){ worst=margin; missing=nd; }
   });
+  return {score:worst, missing:missing};
 }
-/* the original three cluster gauges, reborn as dense voxel matrices.
-   Each cluster is one spectral band (LOW/MID/HIGH). ~2k dots total; the fill
-   climbs bottom-up with dithered edges so it reads as a texture gradient,
-   not a bar. Green = band in tolerance, red = running hot, dim = cold. */
-var gauges=document.getElementById("gauges"), gctx=gauges.getContext("2d");
-function hash2(a,b){ var h=(a*374761393+b*668265263)^(a<<7); h=(h^(h>>13))*1274126177;
-  return ((h^(h>>16))>>>0)/4294967295; }
-function bandStats(lo,hi){
-  var err=0,tot=0,bias=0,n=0;
-  for (var b=0;b<BINS;b++){ var x=b/BINS; if (x<lo||x>=hi) continue;
-    var t=WEAPONS[cur].tgt(b), m=mixAt(x);
-    err+=Math.abs(m-t); tot+=t; bias+=(m-t); n++; }
-  return { fit:Math.max(0,1-err/(tot||1)), hot:bias/(n||1)>0.08, cold:bias/(n||1)<-0.08 };
+function bestRecipe(){
+  var best=null;
+  RECIPES.forEach(function(r){
+    var e=evalRecipe(r);
+    if (!best || e.score>best.e.score) best={r:r,e:e};
+  });
+  return best;
 }
-function drawGauges(){
-  fitCanvas(gauges);
-  var W=gauges.width,H=gauges.height,d=window.devicePixelRatio||1;
-  gctx.clearRect(0,0,W,H);
-  var names=["LOW","MID","HIGH"], gap=10*d, gw=(W-gap*4)/3;
-  var COLS=26, ROWS=26;                          // 3 × 676 ≈ 2k voxels
-  for (var g=0;g<3;g++){
-    var st=bandStats(g/3,(g+1)/3);
-    var gx0=gap+g*(gw+gap), gy0=6*d, gh=H-22*d;
-    var cw=gw/COLS, chh=gh/ROWS;
-    var base = st.hot?[255,90,42] : st.cold?[122,120,106] : [216,255,61];
-    for (var iy=0;iy<ROWS;iy++){
-      var level=1-(iy+0.5)/ROWS;                 // bottom row = level 0
-      for (var ix=0;ix<COLS;ix++){
-        var dz=hash2(ix+g*31,iy)*0.14-0.07;      // dithered edge
-        var on = st.fit >= level+dz;
-        var a = on ? 0.25+0.75*(1-level*0.8)     // gradient: brighter low, fading high
-                   : 0.05+hash2(ix+g*77,iy+13)*0.05;  // faint idle texture
-        gctx.fillStyle="rgba("+base[0]+","+base[1]+","+base[2]+","+(on?a:0.07)+")";
-        var sz=(on?0.62:0.3)*Math.min(cw,chh);
-        gctx.fillRect(gx0+ix*cw+(cw-sz)/2, gy0+iy*chh+(chh-sz)/2, sz, sz);
+
+/* ============ gauges: radial voxel saturation, center-out ============
+   ~169 voxels each × 3 ≈ 500. The saturation band starts at the core and
+   pushes outward as the metric rises — a full dial is a green outer ring
+   with only a faint ember left in the middle. */
+var GN=13;
+function drawGauge(cv,val,invert){
+  var d=window.devicePixelRatio||1, r=cv.getBoundingClientRect();
+  if (!r.width) return;
+  var W=Math.round(r.width*d), H=Math.round(r.height*d);
+  if (cv.width!==W||cv.height!==H){ cv.width=W; cv.height=H; }
+  var ctx=cv.getContext("2d");
+  ctx.clearRect(0,0,W,H);
+  var cw=W/GN, ch=H/GN, cx=(GN-1)/2, cy=(GN-1)/2, maxr=Math.hypot(cx,cy);
+  var s=invert?1-val:val;                        // VOL reads inverted: calm = saturated
+  for (var iy=0;iy<GN;iy++) for (var ix=0;ix<GN;ix++){
+    var rr=Math.hypot(ix-cx,iy-cy)/maxr;         // 0 core → 1 rim
+    var band=Math.exp(-Math.pow((rr-s)/0.22,2)); // the traveling saturation band
+    var ember=Math.exp(-Math.pow(rr/0.25,2))*0.5*s; // faint residue left at the core
+    var dith=(hash2(ix,iy)-0.5)*0.15;
+    var lit=band+dith>0.35, emb=!lit&&(ember+dith>0.18);
+    if (lit){
+      // color rides the radius: core red → mid amber → rim green
+      var cr = rr<0.35?[255,90,42] : rr<0.65?[255,182,61] : [216,255,61];
+      ctx.fillStyle="rgba("+cr[0]+","+cr[1]+","+cr[2]+","+(0.35+band*0.6)+")";
+    } else if (emb){
+      ctx.fillStyle="rgba(255,182,61,"+(0.10+ember*0.15)+")";
+    } else {
+      ctx.fillStyle="rgba(232,228,216,0.05)";
+    }
+    var sz=Math.min(cw,ch)*(lit?0.62:0.34);
+    ctx.fillRect(ix*cw+(cw-sz)/2, iy*ch+(ch-sz)/2, sz, sz);
+  }
+  ctx.fillStyle="#8a8778"; ctx.font=(8*d)+"px monospace"; ctx.textAlign="center";
+  ctx.fillText(Math.round(val*100), W/2, H-3*d);
+}
+
+/* ============ quadrant lattice: 4 quadrants × 4 subcells, ~1k voxels ============ */
+var quad=document.getElementById("quad");
+var QLB=["THERMAL","KINETIC","EM","PAYLOAD"], QKEY=["TH","KN","EM","PL"];
+function drawQuad(){
+  var d=window.devicePixelRatio||1, r=quad.getBoundingClientRect();
+  if (!r.width) return;
+  var W=Math.round(r.width*d), H=Math.round(r.height*d);
+  if (quad.width!==W||quad.height!==H){ quad.width=W; quad.height=H; }
+  var ctx=quad.getContext("2d");
+  ctx.clearRect(0,0,W,H);
+  var q=quads(), m=metrics();
+  var pad=6*d, qw=(W-pad*3)/2, qh=(H-pad*3)/2;
+  var SUB=8;                                     // 8×8 voxels per subcell ×16 = 1024
+  for (var qi=0;qi<4;qi++){
+    var qx=pad+(qi%2)*(qw+pad), qy=pad+((qi/2)|0)*(qh+pad);
+    var sat=q[QKEY[qi]];
+    ctx.strokeStyle="#34343c"; ctx.lineWidth=Math.max(1,d);
+    ctx.strokeRect(qx,qy,qw,qh);
+    for (var sc=0;sc<4;sc++){
+      var sx=qx+(sc%2)*qw/2, sy=qy+((sc/2)|0)*qh/2;
+      // subcell density: quadrant saturation with a per-cell character
+      var dens=clamp(sat + (hash2(qi*7+sc,3)-0.5)*0.25
+                     + (sc===0?m.pow:sc===1?m.eff:sc===2?(1-m.vol):m.vol)*0.15 - 0.08);
+      var cw2=qw/2/SUB, ch2=qh/2/SUB;
+      for (var iy=0;iy<SUB;iy++) for (var ix=0;ix<SUB;ix++){
+        var on=hash2(qi*131+sc*17+ix,iy)<dens;
+        var hot=dens>0.75, cold=dens<0.3;
+        var col=hot?[216,255,61]:cold?[122,120,106]:[255,182,61];
+        ctx.fillStyle="rgba("+col[0]+","+col[1]+","+col[2]+","+(on?0.28+dens*0.55:0.06)+")";
+        var sz=Math.min(cw2,ch2)*(on?0.6:0.28);
+        ctx.fillRect(sx+ix*cw2+(cw2-sz)/2, sy+iy*ch2+(ch2-sz)/2, sz, sz);
       }
     }
-    gctx.fillStyle="#8a8778"; gctx.font=(8*d)+"px monospace"; gctx.textAlign="center";
-    gctx.fillText(names[g]+" "+Math.round(st.fit*100), gx0+gw/2, H-6*d);
+    ctx.fillStyle="#8a8778"; ctx.font=(7*d)+"px monospace"; ctx.textAlign="left";
+    ctx.fillText(QLB[qi]+" "+Math.round(sat*100), qx+4*d, qy+9*d);
   }
 }
-function renderWeapons(){
-  WEAPONS.forEach(function(w,k){
-    var el=document.getElementById("w"+k);
-    var a=P.arsenal[w.id];
-    var mk=a?("MK "+(1+Math.round(a.fit*3))+" · "+Math.round(a.fit*100)+"%"):"uncalibrated";
-    el.className="wpn"+(k===cur?" on":"");
-    el.innerHTML='<span class="k">'+w.name+'</span><span class="mk">'+mk+'</span>';
+
+/* ============ readouts ============ */
+function fmtNeed(nd){
+  var names={eff:"efficiency",pow:"power",vol:"volatility",TH:"thermal lattice",
+             KN:"kinetic lattice",EM:"EM lattice",PL:"payload lattice"};
+  return names[nd[0]]||nd[0];
+}
+function render(){
+  var m=metrics();
+  drawGauge(document.getElementById("g0"),m.eff,false);
+  drawGauge(document.getElementById("g1"),m.pow,false);
+  drawGauge(document.getElementById("g2"),m.vol,true);
+  drawQuad();
+  for (var k=0;k<3;k++) document.getElementById("v"+k).textContent=Math.round(SL[k]*100);
+  // stats card
+  document.getElementById("statlist").innerHTML=
+    '<div class="lrow"><span>EFFICIENCY</span><b>'+Math.round(m.eff*100)+'</b></div>'
+    +'<div class="lrow"><span>POWER</span><b>'+Math.round(m.pow*100)+'</b></div>'
+    +'<div class="lrow"><span>VOLATILITY</span><b>'+Math.round(m.vol*100)+'</b></div>'
+    +(function(){ var b=bestRecipe();
+      return '<div class="lrow"><span>NEAREST</span><b>'+Math.round(b.e.score*100)+'%</b></div>'; })();
+  // loadout card
+  var rows=[];
+  ["TOMAHAWK","ORBITAL","MECHA"].forEach(function(id){
+    var a=P.arsenal[id];
+    rows.push('<div class="li">'+id+' — '+(a?("MK "+(1+Math.round(a.fit*3))):"MK 1")+'</div>');
   });
-  document.getElementById("proflink").textContent=
-    P.sorties?("profile: "+P.sorties+" sorties"):"profile: fresh";
-}
-function renderMixer(){
-  document.getElementById("mixer").innerHTML=CH.map(function(c,k){
-    function param(pk,val,dk){
-      return '<div class="param"><span class="pk">'+pk+'</span><div class="row">'
-        +'<button data-ch="'+k+'" data-p="'+dk+'" data-d="-1">−</button>'
-        +'<span class="pv">'+val+'</span>'
-        +'<button data-ch="'+k+'" data-p="'+dk+'" data-d="1">+</button></div></div>';
-    }
-    return '<div class="ch'+(c.g<=0?" mute":"")+'"><span class="nm">OSC '+String.fromCharCode(65+k)+'</span>'
-      +param("FREQ",Math.round(c.f*100),"f")
-      +param("WIDTH",Math.round(c.w*100),"w")
-      +param("GAIN",Math.round(c.g*100),"g")
-      +'</div>';
-  }).join("");
-}
-function renderFit(){
-  var f=fit();
-  document.getElementById("fitv").textContent=Math.round(f*100)+"%";
-  document.getElementById("fitv").style.color = f>0.8?"#d8ff3d":f>0.5?"#ffb63d":"#e8e4d8";
-  var burn=document.getElementById("burn");
-  var a=P.arsenal[WEAPONS[cur].id];
-  burn.disabled = !!(a && f<=a.fit);              // only better calibrations burn
+  Object.keys(P.unlocks).forEach(function(id){
+    var r=RECIPES.filter(function(x){return x.id===id;})[0];
+    rows.push('<div class="li"><b>'+(r?r.name:id)+'</b> — deployable</div>');
+  });
+  document.getElementById("loadlist").innerHTML=rows.join("");
+  // infomatics + commit
+  var b=bestRecipe();
+  document.getElementById("infoline").innerHTML="<b>"+b.r.name+"</b>";
+  document.getElementById("infodesc").textContent=b.r.desc;
+  document.getElementById("bprof").textContent=P.sorties?P.sorties+" sorties logged":"profile fresh";
+  var viable=b.e.score>=0.999;
+  var already = b.r.kind==="unlock" && P.unlocks[b.r.id];
+  document.getElementById("btnD").disabled=!(viable&&!already);
 }
 
-/* ============ input ============ */
-document.getElementById("mixer").addEventListener("click",function(e){
-  var b=e.target.closest("button"); if (!b) return;
-  var c=CH[+b.dataset.ch], p=b.dataset.p, dl=+b.dataset.d;
-  var step = p==="f"?0.02 : p==="w"?0.01 : 0.05;
-  c[p]=Math.max(0,Math.min(p==="f"?1:p==="w"?0.3:1.2, c[p]+dl*step));
-  renderMixer(); renderFit(); drawSpec(); drawGauges();
+/* ============ testbed ============ */
+document.getElementById("btnC").addEventListener("click",function(){
+  var b=bestRecipe(), h;
+  if (b.e.score>=0.999) h="<b>"+b.r.name+"</b> reads viable — commit on D";
+  else if (b.e.score>0.6) h="<b>"+b.r.name+"</b> at "+Math.round(b.e.score*100)+"% — "+fmtNeed(b.e.missing)
+    +" is off spec";
+  else h="lattice unstable — nearest potential: <b>"+b.r.name+"</b> ("+Math.round(b.e.score*100)+"%)";
+  document.getElementById("hint").innerHTML=h;
 });
-WEAPONS.forEach(function(w,k){
-  document.getElementById("w"+k).addEventListener("click",function(){
-    cur=k; loadCh(); renderWeapons(); renderMixer(); renderFit(); drawSpec(); drawGauges();
-  });
-});
-var burnEl=document.getElementById("burn");
-burnEl.addEventListener("click",function(){
-  if (burnEl.disabled) return;
-  if (armT<=0){ armT=2.5; burnEl.classList.add("armed"); burnEl.textContent="CONFIRM BURN-IN ▸"; return; }
-  armT=0; burnEl.classList.remove("armed"); burnEl.textContent="BURN-IN CALIBRATION";
-  var f=fit();
-  P.arsenal[WEAPONS[cur].id]={fit:Math.round(f*100)/100, ch:CH.map(function(c){return {f:c.f,w:c.w,g:c.g};})};
-  saveP(); renderWeapons(); renderFit();
-  document.getElementById("note").textContent=
-    WEAPONS[cur].name+" calibrated at "+Math.round(f*100)+"% — live in the next sortie";
+var armT=0, btnD=document.getElementById("btnD");
+btnD.addEventListener("click",function(){
+  if (btnD.disabled) return;
+  if (armT<=0){ armT=2.5; btnD.classList.add("armed");
+    btnD.children[1].textContent="CONFIRM ▸"; return; }
+  armT=0; btnD.classList.remove("armed"); btnD.children[1].textContent="RUN PROTOTYPE";
+  var b=bestRecipe(), m=metrics();
+  if (b.r.kind==="tune"){
+    var prev=P.arsenal[b.r.id]?P.arsenal[b.r.id].fit:0;
+    P.arsenal[b.r.id]={fit:Math.max(prev,Math.round(m.eff*100)/100)};
+    document.getElementById("hint").innerHTML="<b>"+b.r.name+"</b> burned in — fit "+Math.round(m.eff*100)+"%";
+  } else {
+    P.unlocks[b.r.id]={ pow:Math.round(m.pow*100)/100, eff:Math.round(m.eff*100)/100,
+                        vol:Math.round(m.vol*100)/100 };
+    document.getElementById("hint").innerHTML="<b>"+b.r.name+"</b> prototyped — deployable next sortie";
+  }
+  saveP(); render();
 });
 setInterval(function(){ if (armT>0){ armT-=0.1;
-  if (armT<=0){ burnEl.classList.remove("armed"); burnEl.textContent="BURN-IN CALIBRATION"; } } },100);
+  if (armT<=0){ btnD.classList.remove("armed"); btnD.children[1].textContent="RUN PROTOTYPE"; } } },100);
 
-loadCh(); renderWeapons(); renderMixer(); renderFit(); drawSpec(); drawGauges();
-window.addEventListener("resize",function(){drawSpec();drawGauges();});
+[0,1,2].forEach(function(k){
+  document.getElementById("s"+k).addEventListener("input",function(){
+    SL[k]=this.value/100; render();
+  });
+});
+document.getElementById("breset").addEventListener("click",function(){
+  SL=[0.5,0.5,0.3];
+  [0,1,2].forEach(function(k){ document.getElementById("s"+k).value=SL[k]*100; });
+  render();
+});
+
+render();
+window.addEventListener("resize",render);
 </script>
 </body>
 </html>
