@@ -21,7 +21,7 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
   font-family:var(--mono);font-size:12px;line-height:1.35;
   -webkit-user-select:none;user-select:none;overscroll-behavior:none;display:flex;justify-content:center}
 @supports (height:100dvh){ html,body{height:100dvh} }
-#device{width:100%;max-width:460px;height:100%;overflow:hidden;display:flex;flex-direction:column;gap:7px;
+#device{width:100%;max-width:460px;height:100%;max-height:960px;overflow:hidden;display:flex;flex-direction:column;gap:7px;
   padding:calc(8px + env(safe-area-inset-top)) 10px calc(10px + env(safe-area-inset-bottom))}
 .card{border:1px solid var(--line);background:var(--panel);border-radius:5px;
   display:flex;flex-direction:column;overflow:hidden}
@@ -83,9 +83,9 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 <main id="device">
   <div id="top">
     <div class="card" id="info"><span class="ph">ARSENAL INFOMATICS</span>
-      <div id="infoline"><b>—</b></div><div class="d" id="infodesc">—</div></div>
+      <div id="infoline"><b>—</b></div><div class="d" id="infodesc">—</div><div class="d" id="sortiecount">—</div></div>
     <div class="card" id="ctrl"><span class="ph">CONTROLS</span>
-      <button id="breset">RESET SLIDERS</button><button id="bprof">—</button></div>
+      <button id="breset">RESET SLIDERS</button><button id="bcommand">◂ COMMAND</button></div>
   </div>
   <div id="gaugerow">
     <div class="card gcard"><span class="ph">EFF</span><canvas id="g0"></canvas></div>
@@ -201,7 +201,8 @@ function drawGauge(cv,val,invert){
   if (cv.width!==W||cv.height!==H){ cv.width=W; cv.height=H; }
   var ctx=cv.getContext("2d");
   ctx.clearRect(0,0,W,H);
-  var cw=W/GN, ch=H/GN, cx=(GN-1)/2, cy=(GN-1)/2, maxr=Math.hypot(cx,cy);
+  var side=Math.min(W,H), ox=(W-side)/2, oy=(H-side)/2;
+  var cw=side/GN, ch=side/GN, cx=(GN-1)/2, cy=(GN-1)/2, maxr=Math.hypot(cx,cy);
   var s=invert?1-val:val;                        // VOL reads inverted: calm = saturated
   for (var iy=0;iy<GN;iy++) for (var ix=0;ix<GN;ix++){
     var rr=Math.hypot(ix-cx,iy-cy)/maxr;         // 0 core → 1 rim
@@ -219,10 +220,10 @@ function drawGauge(cv,val,invert){
       ctx.fillStyle="rgba(232,228,216,0.05)";
     }
     var sz=Math.min(cw,ch)*(lit?0.62:0.34);
-    ctx.fillRect(ix*cw+(cw-sz)/2, iy*ch+(ch-sz)/2, sz, sz);
+    ctx.fillRect(ox+ix*cw+(cw-sz)/2, oy+iy*ch+(ch-sz)/2, sz, sz);
   }
   ctx.fillStyle="#8a8778"; ctx.font=(8*d)+"px monospace"; ctx.textAlign="center";
-  ctx.fillText(Math.round(val*100), W/2, H-3*d);
+  ctx.fillText(Math.round(val*100), W/2, oy+side-3*d);
 }
 
 /* ============ quadrant lattice: 4 quadrants × 4 subcells, ~1k voxels ============ */
@@ -298,7 +299,7 @@ function render(){
   var b=bestRecipe();
   document.getElementById("infoline").innerHTML="<b>"+b.r.name+"</b>";
   document.getElementById("infodesc").textContent=b.r.desc;
-  document.getElementById("bprof").textContent=P.sorties?P.sorties+" sorties logged":"profile fresh";
+  document.getElementById("sortiecount").textContent=P.sorties?P.sorties+" sorties logged":"profile fresh";
   var viable=b.e.score>=0.999;
   var already = b.r.kind==="unlock" && P.unlocks[b.r.id];
   document.getElementById("btnD").disabled=!(viable&&!already);
@@ -343,6 +344,9 @@ document.getElementById("breset").addEventListener("click",function(){
   SL=[0.5,0.5,0.3];
   [0,1,2].forEach(function(k){ document.getElementById("s"+k).value=SL[k]*100; });
   render();
+});
+document.getElementById("bcommand").addEventListener("click",function(){
+  location.href="index.html";
 });
 
 render();

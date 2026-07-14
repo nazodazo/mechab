@@ -132,6 +132,10 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 #prof .up{color:var(--us)} #prof .star{color:var(--amber)}
 #launch{padding:14px;background:transparent;border:1px solid var(--us);color:var(--us);
   font-family:var(--mono);letter-spacing:.14em;font-size:13px}
+#menunav{display:flex;gap:8px}
+#menunav button{flex:1}
+#bench{padding:14px;background:transparent;border:1px solid var(--amber);color:var(--amber);
+  font-family:var(--mono);letter-spacing:.14em;font-size:13px}
 </style>
 </head>
 <body>
@@ -163,7 +167,8 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
     <button class="tile" id="bC"></button><button class="tile" id="bD"></button>
   </div>
   <div id="debrief"><h2 id="verdict">—</h2><div id="receipts"></div><button id="again">RETURN TO COMMAND</button></div>
-  <div id="menu"><h2>WARCLOCK // COMMAND</h2><div id="prof"></div><button id="launch">LAUNCH SORTIE</button></div>
+  <div id="menu"><h2>WARCLOCK // COMMAND</h2><div id="prof"></div>
+    <div id="menunav"><button id="launch">LAUNCH SORTIE</button><button id="bench">ARSENAL BENCH</button></div></div>
 </main>
 
 <script>
@@ -1434,6 +1439,9 @@ document.getElementById("launch").addEventListener("click",function(){
   S.paused=false;
   var bp=document.getElementById("btnpause");
   bp.textContent="⏸"; bp.classList.remove("on");
+});
+document.getElementById("bench").addEventListener("click",function(){
+  location.href="bench.html";
 });
 
 /* ================= loop ================= */
