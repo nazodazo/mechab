@@ -54,9 +54,14 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 /* bottom: loadout+stats left, sliders+testbed right */
 #bottom{flex:1.5;min-height:0;display:flex;gap:7px}
 #leftcol{width:40%;flex:none;display:flex;flex-direction:column;gap:7px;min-height:0}
-#loadout{flex:1;min-height:0;overflow:hidden}
-#loadout .li{font-size:10px;padding:1px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--dim)}
+#loadout{flex:1;min-height:0;overflow-y:auto}
+#loadout .li{font-size:10px;padding:3px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  color:var(--dim);width:100%;text-align:left;background:transparent;border:none;border-left:2px solid transparent;
+  font-family:var(--mono);touch-action:manipulation;display:block}
 #loadout .li b{color:var(--us);font-weight:400}
+#loadout .li.sel{color:var(--ink);border-left-color:var(--amber);background:rgba(255,182,61,.08)}
+#loadout .li.sel b{color:var(--amber)}
+#loadout .li:active{background:rgba(255,182,61,.16)}
 #stats{flex:1;min-height:0}
 #stats .lrow{display:flex;justify-content:space-between;font-size:10px;color:var(--dim);padding:1px 10px}
 #stats .lrow b{color:var(--ink);font-weight:400}
@@ -64,9 +69,14 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 .sld{flex:none;border:1px solid var(--line);background:var(--panel);border-radius:4px;padding:5px 10px 7px}
 .sld .sk{font-size:9px;color:var(--dim);letter-spacing:.14em;display:flex;justify-content:space-between}
 .sld input{width:100%;margin-top:4px;-webkit-appearance:none;appearance:none;height:4px;border-radius:2px;
-  background:var(--line);outline:none}
-.sld input::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:22px;height:22px;border-radius:4px;
-  background:var(--bg);border:1px solid var(--ink);cursor:pointer}
+  outline:none;background-image:repeating-linear-gradient(to right,var(--ink) 0,var(--ink) 1px,transparent 1px,transparent calc(100%/20));
+  background-color:var(--line);background-repeat:no-repeat}
+.sld input::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:20px;height:20px;border-radius:4px;
+  background:var(--bg);border:1px solid var(--ink);cursor:pointer;transition:transform .06s ease}
+.sld input.snap::-webkit-slider-thumb{transform:scale(1.22);border-color:var(--amber)}
+.sld input::-moz-range-thumb{width:20px;height:20px;border-radius:4px;
+  background:var(--bg);border:1px solid var(--ink);cursor:pointer;transition:transform .06s ease}
+.sld input.snap::-moz-range-thumb{transform:scale(1.22);border-color:var(--amber)}
 #testbed{flex:1;min-height:0;display:flex;gap:7px}
 #testbed button{flex:1;border-radius:5px;font-family:var(--mono);letter-spacing:.06em;font-size:12px;
   background:var(--panel);border:1px solid var(--line);color:var(--ink);touch-action:manipulation;
@@ -101,11 +111,11 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
     </div>
     <div id="rightcol">
       <div class="sld"><span class="sk"><span>CHARGE</span><span id="v0">50</span></span>
-        <input type="range" id="s0" min="0" max="100" value="50"></div>
+        <input type="range" id="s0" min="0" max="100" step="5" value="50"></div>
       <div class="sld"><span class="sk"><span>FOCUS</span><span id="v1">50</span></span>
-        <input type="range" id="s1" min="0" max="100" value="50"></div>
+        <input type="range" id="s1" min="0" max="100" step="5" value="50"></div>
       <div class="sld"><span class="sk"><span>MODULATION</span><span id="v2">30</span></span>
-        <input type="range" id="s2" min="0" max="100" value="30"></div>
+        <input type="range" id="s2" min="0" max="100" step="5" value="30"></div>
       <div id="testbed">
         <button id="btnC"><span class="k">C · TEST</span><span>PROBE LATTICE</span></button>
         <button id="btnD" disabled><span class="k">D · COMMIT</span><span>RUN PROTOTYPE</span></button>
@@ -128,10 +138,11 @@ var P=(function(){
 })();
 if (!P.arsenal) P.arsenal={};
 if (!P.unlocks) P.unlocks={};
+if (!P.builds) P.builds={};       // per-weapon slider profile — each recipe keeps its own build
 function saveP(){ try{ localStorage.setItem("warclock_profile",JSON.stringify(P)); }catch(e){} }
 
 /* ============ the formula space ============ */
-var SL=[0.5,0.5,0.3];    // CHARGE, FOCUS, MODULATION
+var SL=[0.5,0.5,0.3];    // CHARGE, FOCUS, MODULATION — the SELECTED weapon's build
 function metrics(){
   var a=SL[0],b=SL[1],c=SL[2];
   return {
@@ -188,12 +199,25 @@ function bestRecipe(){
   });
   return best;
 }
+/* ============ selectable arsenal loadout: each weapon keeps its own build ============ */
+var selectedId = (P.selectedArsenal && RECIPES.some(function(r){return r.id===P.selectedArsenal;}))
+  ? P.selectedArsenal : RECIPES[0].id;
+function recipeById(id){ return RECIPES.filter(function(r){return r.id===id;})[0]; }
+function currentRecipe(){ return recipeById(selectedId)||RECIPES[0]; }
+function loadBuild(id){
+  SL=(P.builds[id]||[0.5,0.5,0.3]).slice();
+  [0,1,2].forEach(function(k){ document.getElementById("s"+k).value=Math.round(SL[k]*100); });
+}
+function selectArsenal(id){
+  selectedId=id; P.selectedArsenal=id; saveP(); loadBuild(id); render();
+}
 
 /* ============ gauges: radial voxel saturation, center-out ============
-   ~169 voxels each × 3 ≈ 500. The saturation band starts at the core and
+   ~361 voxels each × 3 ≈ 1080. The saturation band starts at the core and
    pushes outward as the metric rises — a full dial is a green outer ring
-   with only a faint ember left in the middle. */
-var GN=13;
+   with only a faint ember left in the middle. Tight packing (few gaps)
+   reads as one continuous dial rather than a scatter of dots. */
+var GN=19;
 function drawGauge(cv,val,invert){
   var d=window.devicePixelRatio||1, r=cv.getBoundingClientRect();
   if (!r.width) return;
@@ -219,7 +243,7 @@ function drawGauge(cv,val,invert){
     } else {
       ctx.fillStyle="rgba(232,228,216,0.05)";
     }
-    var sz=Math.min(cw,ch)*(lit?0.62:0.34);
+    var sz=Math.min(cw,ch)*(lit?0.86:0.5);
     ctx.fillRect(ox+ix*cw+(cw-sz)/2, oy+iy*ch+(ch-sz)/2, sz, sz);
   }
   ctx.fillStyle="#8a8778"; ctx.font=(8*d)+"px monospace"; ctx.textAlign="center";
@@ -238,7 +262,7 @@ function drawQuad(){
   ctx.clearRect(0,0,W,H);
   var q=quads(), m=metrics();
   var pad=6*d, qw=(W-pad*3)/2, qh=(H-pad*3)/2;
-  var SUB=8;                                     // 8×8 voxels per subcell ×16 = 1024
+  var SUB=12;                                    // 12×12 voxels per subcell ×16 = 2304
   for (var qi=0;qi<4;qi++){
     var qx=pad+(qi%2)*(qw+pad), qy=pad+((qi/2)|0)*(qh+pad);
     var sat=q[QKEY[qi]];
@@ -255,7 +279,7 @@ function drawQuad(){
         var hot=dens>0.75, cold=dens<0.3;
         var col=hot?[216,255,61]:cold?[122,120,106]:[255,182,61];
         ctx.fillStyle="rgba("+col[0]+","+col[1]+","+col[2]+","+(on?0.28+dens*0.55:0.06)+")";
-        var sz=Math.min(cw2,ch2)*(on?0.6:0.28);
+        var sz=Math.min(cw2,ch2)*(on?0.88:0.42);
         ctx.fillRect(sx+ix*cw2+(cw2-sz)/2, sy+iy*ch2+(ch2-sz)/2, sz, sz);
       }
     }
@@ -277,41 +301,44 @@ function render(){
   drawGauge(document.getElementById("g2"),m.vol,true);
   drawQuad();
   for (var k=0;k<3;k++) document.getElementById("v"+k).textContent=Math.round(SL[k]*100);
-  // stats card
+  var cur=currentRecipe(), curE=evalRecipe(cur);
+  // stats card — reads the SELECTED weapon's build against its own target
   document.getElementById("statlist").innerHTML=
     '<div class="lrow"><span>EFFICIENCY</span><b>'+Math.round(m.eff*100)+'</b></div>'
     +'<div class="lrow"><span>POWER</span><b>'+Math.round(m.pow*100)+'</b></div>'
     +'<div class="lrow"><span>VOLATILITY</span><b>'+Math.round(m.vol*100)+'</b></div>'
-    +(function(){ var b=bestRecipe();
-      return '<div class="lrow"><span>NEAREST</span><b>'+Math.round(b.e.score*100)+'%</b></div>'; })();
-  // loadout card
+    +'<div class="lrow"><span>MATCH</span><b>'+Math.round(curE.score*100)+'%</b></div>';
+  // loadout card — every recipe is a selectable profile with its own build
   var rows=[];
-  ["TOMAHAWK","ORBITAL","MECHA"].forEach(function(id){
-    var a=P.arsenal[id];
-    rows.push('<div class="li">'+id+' — '+(a?("MK "+(1+Math.round(a.fit*3))):"MK 1")+'</div>');
-  });
-  Object.keys(P.unlocks).forEach(function(id){
-    var r=RECIPES.filter(function(x){return x.id===id;})[0];
-    rows.push('<div class="li"><b>'+(r?r.name:id)+'</b> — deployable</div>');
+  RECIPES.forEach(function(r){
+    var status;
+    if (r.kind==="tune"){ var a=P.arsenal[r.id]; status=a?("MK "+(1+Math.round(a.fit*3))):"MK 1"; }
+    else status=P.unlocks[r.id]?"deployable":"locked target";
+    rows.push('<button class="li'+(r.id===selectedId?' sel':'')+'" data-id="'+r.id+'">'
+      +r.id+' — '+status+'</button>');
   });
   document.getElementById("loadlist").innerHTML=rows.join("");
-  // infomatics + commit
-  var b=bestRecipe();
-  document.getElementById("infoline").innerHTML="<b>"+b.r.name+"</b>";
-  document.getElementById("infodesc").textContent=b.r.desc;
+  // infomatics + commit — targets the SELECTED weapon, not just the best-scoring one
+  document.getElementById("infoline").innerHTML="<b>"+cur.name+"</b>";
+  document.getElementById("infodesc").textContent=cur.desc;
   document.getElementById("sortiecount").textContent=P.sorties?P.sorties+" sorties logged":"profile fresh";
-  var viable=b.e.score>=0.999;
-  var already = b.r.kind==="unlock" && P.unlocks[b.r.id];
+  var viable=curE.score>=0.999;
+  var already = cur.kind==="unlock" && P.unlocks[cur.id];
   document.getElementById("btnD").disabled=!(viable&&!already);
 }
+document.getElementById("loadlist").addEventListener("click",function(e){
+  var b=e.target.closest?e.target.closest(".li"):null;
+  if (!b) return;
+  selectArsenal(b.getAttribute("data-id"));
+});
 
-/* ============ testbed ============ */
+/* ============ testbed — always reads against the SELECTED weapon's target ============ */
 document.getElementById("btnC").addEventListener("click",function(){
-  var b=bestRecipe(), h;
-  if (b.e.score>=0.999) h="<b>"+b.r.name+"</b> reads viable — commit on D";
-  else if (b.e.score>0.6) h="<b>"+b.r.name+"</b> at "+Math.round(b.e.score*100)+"% — "+fmtNeed(b.e.missing)
+  var r=currentRecipe(), e=evalRecipe(r), h;
+  if (e.score>=0.999) h="<b>"+r.name+"</b> reads viable — commit on D";
+  else if (e.score>0.6) h="<b>"+r.name+"</b> at "+Math.round(e.score*100)+"% — "+fmtNeed(e.missing)
     +" is off spec";
-  else h="lattice unstable — nearest potential: <b>"+b.r.name+"</b> ("+Math.round(b.e.score*100)+"%)";
+  else h="lattice unstable for <b>"+r.name+"</b> — "+Math.round(e.score*100)+"% match";
   document.getElementById("hint").innerHTML=h;
 });
 var armT=0, btnD=document.getElementById("btnD");
@@ -320,28 +347,36 @@ btnD.addEventListener("click",function(){
   if (armT<=0){ armT=2.5; btnD.classList.add("armed");
     btnD.children[1].textContent="CONFIRM ▸"; return; }
   armT=0; btnD.classList.remove("armed"); btnD.children[1].textContent="RUN PROTOTYPE";
-  var b=bestRecipe(), m=metrics();
-  if (b.r.kind==="tune"){
-    var prev=P.arsenal[b.r.id]?P.arsenal[b.r.id].fit:0;
-    P.arsenal[b.r.id]={fit:Math.max(prev,Math.round(m.eff*100)/100)};
-    document.getElementById("hint").innerHTML="<b>"+b.r.name+"</b> burned in — fit "+Math.round(m.eff*100)+"%";
+  var r=currentRecipe(), m=metrics();
+  if (r.kind==="tune"){
+    var prev=P.arsenal[r.id]?P.arsenal[r.id].fit:0;
+    P.arsenal[r.id]={fit:Math.max(prev,Math.round(m.eff*100)/100)};
+    document.getElementById("hint").innerHTML="<b>"+r.name+"</b> burned in — fit "+Math.round(m.eff*100)+"%";
   } else {
-    P.unlocks[b.r.id]={ pow:Math.round(m.pow*100)/100, eff:Math.round(m.eff*100)/100,
-                        vol:Math.round(m.vol*100)/100 };
-    document.getElementById("hint").innerHTML="<b>"+b.r.name+"</b> prototyped — deployable next sortie";
+    P.unlocks[r.id]={ pow:Math.round(m.pow*100)/100, eff:Math.round(m.eff*100)/100,
+                      vol:Math.round(m.vol*100)/100 };
+    document.getElementById("hint").innerHTML="<b>"+r.name+"</b> prototyped — deployable next sortie";
   }
   saveP(); render();
 });
 setInterval(function(){ if (armT>0){ armT-=0.1;
   if (armT<=0){ btnD.classList.remove("armed"); btnD.children[1].textContent="RUN PROTOTYPE"; } } },100);
 
+/* sliders snap in 5% notches — a discrete profile per weapon, not one shared analog build */
 [0,1,2].forEach(function(k){
-  document.getElementById("s"+k).addEventListener("input",function(){
-    SL[k]=this.value/100; render();
+  var el=document.getElementById("s"+k), snapT=0;
+  el.addEventListener("input",function(){
+    SL[k]=this.value/100;
+    P.builds[selectedId]=SL.slice(); saveP();
+    this.classList.add("snap"); snapT=1;
+    if (navigator.vibrate) navigator.vibrate(4);
+    render();
   });
+  setInterval(function(){ if (snapT>0){ snapT-=0.1; if (snapT<=0) el.classList.remove("snap"); } },50);
 });
 document.getElementById("breset").addEventListener("click",function(){
   SL=[0.5,0.5,0.3];
+  P.builds[selectedId]=SL.slice(); saveP();
   [0,1,2].forEach(function(k){ document.getElementById("s"+k).value=SL[k]*100; });
   render();
 });
@@ -349,6 +384,7 @@ document.getElementById("bcommand").addEventListener("click",function(){
   location.href="index.html";
 });
 
+loadBuild(selectedId);
 render();
 window.addEventListener("resize",render);
 </script>
