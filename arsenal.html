@@ -197,7 +197,7 @@ function layoutTree(){
   });
   layout.push({x:0.5,y:0.5,node:null,idx:-1,depth:0});   // the seed
   nodes.forEach(function(n,i){
-    var rr=depth[i]/(maxDepth+0.6)*0.44;
+    var rr=depth[i]/(maxDepth+0.6)*0.47;
     layout.push({ x:0.5+rr*Math.cos(angle[i]), y:0.5+rr*Math.sin(angle[i]),
                   node:n, idx:i, depth:depth[i] });
   });
@@ -214,7 +214,7 @@ function drawTree(){
   var maxD=1; layout.forEach(function(L){ if (L.depth>maxD) maxD=L.depth; });
   ctx.strokeStyle="#26262d"; ctx.lineWidth=Math.max(1,d);
   for (var t2=1;t2<=maxD;t2++){
-    var rr=t2/(maxD+0.6)*0.44*Math.min(W,H);
+    var rr=t2/(maxD+0.6)*0.47*Math.min(W,H);
     ctx.beginPath(); ctx.arc(W/2,H/2,rr,0,Math.PI*2); ctx.stroke();
   }
   // edges
@@ -228,7 +228,7 @@ function drawTree(){
   });
   // nodes — square voxel bits in the axis color, selected one ringed
   layout.forEach(function(L){
-    var sz=(L.node?7:9)*d;
+    var sz=(L.node?11:14)*d;
     var col=L.node?(AXIS_COL[L.node.axis]||"#e8e4d8"):"#8a8778";
     ctx.fillStyle=col;
     if (L.idx===selectedNode){

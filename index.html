@@ -138,6 +138,9 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
   font-family:var(--mono);letter-spacing:.14em;font-size:13px}
 #arsenal{padding:14px;background:transparent;border:1px solid var(--dim);color:var(--ink);
   font-family:var(--mono);letter-spacing:.14em;font-size:13px}
+#doctrine{padding:11px;background:transparent;border:1px dashed var(--line);color:var(--dim);
+  font-family:var(--mono);letter-spacing:.14em;font-size:11px}
+#doctrine.agg{border-color:var(--foe);color:var(--foe)}
 </style>
 </head>
 <body>
@@ -170,6 +173,7 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
   </div>
   <div id="debrief"><h2 id="verdict">—</h2><div id="receipts"></div><button id="again">RETURN TO COMMAND</button></div>
   <div id="menu"><h2>WARCLOCK // COMMAND</h2><div id="prof"></div>
+    <button id="doctrine">DOCTRINE — CONSERVATIVE</button>
     <div id="menunav"><button id="launch">LAUNCH SORTIE</button><button id="bench">ARSENAL BENCH</button><button id="arsenal">ARSENAL TREE</button></div></div>
 </main>
 
@@ -179,6 +183,22 @@ body{position:fixed;inset:0;width:100%;background:var(--bg);color:var(--ink);
 var GW=112, GH=64, N=GW*GH;                 // ~7k control cells — chunkier war, cheaper sim
 var BW=8, BX=GW/BW, BY=GH/BW;
 var HGW=160, HGH=92, HN=HGW*HGH;             // ~15k virtual samples for smooth topo, contour only
+/* ============ sound: sparse instrument-panel synth, no assets ============ */
+var AC=null;
+function ac(){ if (!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} }
+  if (AC&&AC.state==="suspended") AC.resume(); return AC; }
+function snd(f,dur,type,g,when){
+  var a=AC; if (!a||a.state!=="running") return;
+  var t0=a.currentTime+(when||0), o=a.createOscillator(), gn=a.createGain();
+  o.type=type||"square"; o.frequency.value=f;
+  gn.gain.setValueAtTime(g||0.04,t0); gn.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
+  o.connect(gn); gn.connect(a.destination); o.start(t0); o.stop(t0+dur+0.02);
+}
+function sndAlarm(){ snd(880,0.09,"square",0.045); snd(660,0.12,"square",0.045,0.13); }
+function sndClick(){ snd(1300,0.03,"square",0.035); }
+function sndRumble(){ snd(58,0.55,"sawtooth",0.11); snd(44,0.8,"sawtooth",0.09,0.05); }
+function sndTick(){ snd(1500,0.02,"square",0.028); }
+function sndEnd(){ snd(440,0.25,"triangle",0.06); snd(330,0.45,"triangle",0.06,0.28); }
 var mapC=document.getElementById("map"), mctx=mapC.getContext("2d");
 var trC=document.getElementById("trend"), tctx=trC.getContext("2d");
 var fcC=document.getElementById("forces"), fctx=fcC.getContext("2d");
@@ -204,6 +224,7 @@ function reset(){
       cue:null, arm:[0,0,0,0,0], mon:null,
       mechaCd:0, mechaUnit:null,
       kiaB:0, kiaO:0, opsDone:0, ff:0, domT:0, fx:[],
+      holds:0, commits:0, lapses:0, vind:0, judg:[], lastTickS:-1, lev:1,
       forts:[], build:{}, recoup:{"1":0,"-1":0},
       troops:[],
       squads:[ mkSquad("141",1,true), mkSquad("BULL-6",1,false), mkSquad("RAZOR-2",1,false),
@@ -445,6 +466,7 @@ function addFx(x,y,rad,kind){ S.fx.push({x:x,y:y,rad:rad,t:0,dur:kind==="strike"
    craters the height field, avalanches ridges flat, kills EVERYONE inside. */
 function strike(cx,cy,rad,amt){
   addFx(cx,cy,rad,"strike");
+  sndRumble();
   for (var y=Math.max(0,cy-rad|0);y<Math.min(GH,cy+rad);y++)
     for (var x=Math.max(0,cx-rad|0);x<Math.min(GW,cx+rad);x++){
       var dd=Math.hypot(x-cx,y-cy); if (dd>rad) continue;
@@ -577,16 +599,16 @@ function squadTick(sq,dt){
     var dx=tx-sq.x, dy=ty-sq.y, dist=Math.hypot(dx,dy);
     if (dist<2){ sq.phase="WORK"; sq.prog=0; sq.heat=0;
       if (sq.player) tick("141 on objective — "+sq.op.desc,"team"); return; }
-    var sp=((sq.player&&sq.urge)?9:6)*dt; sq.x+=dx/dist*sp; sq.y+=dy/dist*sp;
+    var sp=((sq.player&&sq.urge)?9:6)*(sq.player&&isAgg()?1.25:1)*dt; sq.x+=dx/dist*sp; sq.y+=dy/dist*sp;
     return;
   }
   if (sq.phase==="WORK"){
     // a crew member built for this op-type carries it faster — loadout matters
     var fit=sq.crew.some(function(m){return m.st==="OK"&&m.role===sq.op.id;});
-    sq.prog += dt*((sq.player&&sq.urge)?11:6.5)*sq.morale*(fit?1.3:1);
+    sq.prog += dt*((sq.player&&sq.urge)?11:6.5)*(sq.player?(isAgg()?1.2:1):1)*sq.morale*(fit?1.3:1);
     blast(sq.x,sq.y,3,sq.side*0.05*dt*6);
     if (sq.player){
-      sq.heat += dt*(sq.urge?1.4:0.55)*(1+Math.max(0,-S.c[((sq.y|0)*GW+(sq.x|0))]||0)*0.8);
+      sq.heat += dt*(sq.urge?1.4:0.55)*(isAgg()?1.35:0.85)*(1+Math.max(0,-S.c[((sq.y|0)*GW+(sq.x|0))]||0)*0.8);
       if (!S.cue && Math.random()<dt*0.3) raiseRequest(sq);
       if (sq.heat>10 && Math.random()<dt*0.18) teamHit(sq,"taking fire on the objective");
     } else if (Math.random()<dt*0.02){ sq.phase="DOWN"; sq.pt=12;
@@ -618,6 +640,10 @@ function pickObjective(sq){
     return {b:by*BX+bx,x:bx,y:by,frac:1,mean:n2?sum/n2:0};
   }
   var mine=S.hotspots.filter(function(h){ return h.mean*sq.side<0.15; });
+  if (sq.player && isAgg() && mine.length){       // aggressive doctrine hunts the deepest hostile ground
+    var deep=mine.slice().sort(function(a,b){ return a.mean*sq.side-b.mean*sq.side; });
+    return deep[0];
+  }
   if (mine.length) return mine[(Math.random()*Math.min(2,mine.length))|0];
   if (S.hotspots.length) return S.hotspots[0];
   var bx2=(BX/2-1+(Math.random()*3|0))|0, by2=(Math.random()*BY)|0;
@@ -644,38 +670,86 @@ function teamHit(sq,why){
     S.receipts.push("██ "+sq.name+" wiped to extraction — refit, morale down.");
   }
 }
+/* entry: [verb, cost, can, yes(sq), no(sq), gain-gist for counterfactual receipts].
+   yes-effects scale by S.lev — the leverage left in the window when you committed. */
 var REQ_POOLS={
   DA:[["APPROVE CHARGES","−80 req",function(){return S.req>=80;},
-        function(sq){S.req-=80;sq.prog+=30;tick("141: charges set — ahead of schedule","up");},
-        function(sq){tick("141: copy — slow way then","team");}],
+        function(sq){S.req-=80;sq.prog+=Math.round(30*S.lev);tick("141: charges set — ahead of schedule","up");},
+        function(sq){tick("141: copy — slow way then","team");},"+30% progress"],
       ["CAS DANGER-CLOSE","−1 cas",function(){return S.cas>0;},
         function(sq){S.cas--;sq.heat=0;tick("CAS inbound — keep heads down","rq",true);S.mon={kind:"CAS",label:"CAS RUN",t:0,dur:3.5, at:3.5*0.7, fx:function(){blast(sq.x,sq.y,8,0.5);addFx(sq.x,sq.y,8,"blast");tick("CAS in — danger close","up",true);}};},
-        function(sq){sq.prog=Math.max(0,sq.prog-15);tick("141: no air — breaking contact","team");}]],
+        function(sq){sq.prog=Math.max(0,sq.prog-15);tick("141: no air — breaking contact","team");},"heat cleared, area struck"]],
   SR:[["APPROVE BRIBE","−100 req",function(){return S.req>=100;},
-        function(sq){S.req-=100;sq.prog+=35;tick("141: asset paid — doors open","up");},
-        function(sq){sq.heat+=2;tick("141: going in dirty","team");}],
+        function(sq){S.req-=100;sq.prog+=Math.round(35*S.lev);tick("141: asset paid — doors open","up");},
+        function(sq){sq.heat+=2;tick("141: going in dirty","team");},"+35% progress"],
       ["APPROVE RIG","−60 req",function(){return S.req>=60;},
-        function(sq){S.req-=60;sq.heat=Math.max(0,sq.heat-4);tick("141: decoys out — heat off","up");},
-        function(sq){sq.heat+=1.5;tick("141: negative — staying loud","team");}]],
+        function(sq){S.req-=60;sq.heat=Math.max(0,sq.heat-4*S.lev);tick("141: decoys out — heat off","up");},
+        function(sq){sq.heat+=1.5;tick("141: negative — staying loud","team");},"heat drawn off"]],
   TG:[["APPROVE RELAY","−1 MAT",function(){return S.mat>=1;},
-        function(sq){S.mat--;sq.prog+=40;tick("141: relay burned in — uplink hot","up");},
-        function(sq){tick("141: hand-cranking the array","team");}],
+        function(sq){S.mat--;sq.prog+=Math.round(40*S.lev);tick("141: relay burned in — uplink hot","up");},
+        function(sq){tick("141: hand-cranking the array","team");},"+40% progress"],
       ["APPROVE RIG","−60 req",function(){return S.req>=60;},
-        function(sq){S.req-=60;sq.heat=Math.max(0,sq.heat-4);tick("141: decoys out","up");},
-        function(sq){sq.heat+=1.5;}]],
+        function(sq){S.req-=60;sq.heat=Math.max(0,sq.heat-4*S.lev);tick("141: decoys out","up");},
+        function(sq){sq.heat+=1.5;},"heat drawn off"]],
   UW:[["APPROVE ARMS DROP","−120 req",function(){return S.req>=120;},
-        function(sq){S.req-=120;blast(sq.x,sq.y,6,0.35);tick("141: locals armed — line surging","up");},
-        function(sq){tick("141: holding with what we have","team");}],
+        function(sq){S.req-=120;blast(sq.x,sq.y,6,0.35*S.lev);tick("141: locals armed — line surging","up");},
+        function(sq){tick("141: holding with what we have","team");},"line surge"],
       ["CAS DANGER-CLOSE","−1 cas",function(){return S.cas>0;},
         function(sq){S.cas--;sq.heat=0;tick("CAS inbound — keep heads down","rq",true);S.mon={kind:"CAS",label:"CAS RUN",t:0,dur:3.5, at:3.5*0.7, fx:function(){blast(sq.x,sq.y,8,0.5);addFx(sq.x,sq.y,8,"blast");tick("CAS in — danger close","up",true);}};},
-        function(sq){sq.prog=Math.max(0,sq.prog-15);}]],
+        function(sq){sq.prog=Math.max(0,sq.prog-15);},"heat cleared, area struck"]],
 };
 function raiseRequest(sq){
   var pool=(REQ_POOLS[sq.op.id]||REQ_POOLS.DA).filter(function(r){return r[2]();});
   if (!pool.length) return;
   var r=pool[(Math.random()*pool.length)|0];
-  S.cue={ verb:r[0], cost:r[1], yes:r[3], no:r[4], sq:sq, left:6, dur:6 };
+  S.cue={ verb:r[0], cost:r[1], yes:r[3], no:r[4], gain:r[5]||"", sq:sq, left:6, dur:6 };
+  sndAlarm();
   tick("141 requests: "+r[0]+" ("+r[1]+")","rq",true);
+}
+/* ============ the warclock ledger of decisions ============
+   Every window closes with a DECISION — COMMIT (approve), HOLD (explicit,
+   logged restraint) or NO CALL (the window lapsed). Each is judged 8s later
+   against what actually happened around 141: an honest counterfactual, not a
+   shadow sim — what changed locally, plus what the declined verb would have
+   mechanically added. Disciplined non-intervention is a skill; it gets receipts. */
+var LEV_FLOOR=0.55;
+function cueLev(){ return S.cue?Math.round((LEV_FLOOR+(1-LEV_FLOOR)*S.cue.left/S.cue.dur)*100):100; }
+function localMean(x,y){
+  var s=0,n=0;
+  for (var yy=Math.max(0,(y|0)-5);yy<Math.min(GH,(y|0)+5);yy++)
+    for (var xx=Math.max(0,(x|0)-5);xx<Math.min(GW,(x|0)+5);xx++){
+      var i=yy*GW+xx; if (!S.terr[i]){ s+=S.c[i]; n++; } }
+  return n?s/n:0;
+}
+function okCount(sq){ return sq.crew.filter(function(m){return m.st==="OK";}).length; }
+function judgeLater(kind,cue,lev){
+  var sq=cue.sq;
+  S.judg.push({ kind:kind, verb:cue.verb, cost:cue.cost, gain:cue.gain, lev:lev||0,
+                at:S.t, wait:8, x:sq.x, y:sq.y, l0:localMean(sq.x,sq.y), ok0:okCount(sq), sq:sq });
+}
+function judgeEval(J){
+  var dl=Math.round((localMean(J.x,J.y)-J.l0)*50);        // local front shift, ±%-ish
+  var lost=J.ok0-okCount(J.sq), ts=(180-J.at)|0;
+  if (J.kind==="COMMIT"){
+    S.receipts.push("◈ COMMIT @"+ts+"s — "+J.verb+" at "+J.lev+"% leverage — front "
+      +(dl>=0?"+":"")+dl+"% since");
+    return;
+  }
+  var lbl=J.kind==="HOLD"?"HOLD":"NO CALL";
+  if (lost>0){
+    S.receipts.push("▼ "+lbl+" @"+ts+"s — "+lost+" operative"+(lost>1?"s":"")+" hit after; "
+      +J.verb+" ("+J.gain+") might have prevented it");
+    if (J.kind==="HOLD") tick("the hold cost us — "+J.verb+" was there","bad",true);
+  } else if (dl>=-3){
+    S.receipts.push("◈ "+lbl+" @"+ts+"s — 141 carried it without help. "+J.cost+" saved");
+    if (J.kind==="HOLD"){ S.vind++; tick("your hold was right — "+J.cost+" saved","up",true); }
+  } else {
+    S.receipts.push("▼ "+lbl+" @"+ts+"s — front "+dl+"% since; "+J.verb+" ("+J.gain+") was the call");
+  }
+}
+function judgeTick(dt){
+  for (var k=S.judg.length-1;k>=0;k--){ var J=S.judg[k]; J.wait-=dt;
+    if (J.wait<=0){ S.judg.splice(k,1); judgeEval(J); } }
 }
 
 /* ============ LAOE: mecha drop / tomahawk / orbital ============ */
@@ -768,12 +842,17 @@ function advance(dt){
   S.squads.forEach(function(sq){ squadTick(sq,dt); });
   mechaTick(dt);
   barrageTick(dt);
-  if (S.cue){ S.cue.left-=dt; if (S.cue.left<=0){ S.cue.no(S.cue.sq); S.cue=null; } }
+  if (S.cue){ S.cue.left-=dt;
+    if (S.cue.left<=0){ var cu=S.cue; S.cue=null;      // a lapsed window is indecision, and it's logged
+      S.lapses++; judgeLater("LAPSE",cu,0); cu.no(cu.sq);
+      tick("window lapsed — no call from command","bad",true); } }
+  judgeTick(dt);
+  if (S.t<=10 && (S.t|0)!==S.lastTickS){ S.lastTickS=S.t|0; sndTick(); }
   if (S.mon){ S.mon.t+=dt;
     if (S.mon.fx && !S.mon.fired && S.mon.t>=S.mon.at){ S.mon.fired=true; S.mon.fx(); }
     if (S.mon.t>=S.mon.dur) S.mon=null; }
   for (var f6=S.fx.length-1;f6>=0;f6--){ S.fx[f6].t+=dt; if (S.fx[f6].t>=S.fx[f6].dur) S.fx.splice(f6,1); }
-  S.req+=dt*2;
+  S.req+=dt*3;
   S.tide=tideCalc(); S.hist.push(S.tide);
   // early end only on SUSTAINED dominance — a spike shouldn't end a theatre
   var gp=(S.tide+1)/2;
@@ -782,6 +861,8 @@ function advance(dt){
 }
 function end(){
   S.over=true;
+  sndEnd();
+  S.judg.forEach(function(J){ judgeEval(J); }); S.judg.length=0;   // judge what's still pending
   var gp=groundPct();
   // bands calibrated so ~60% ground is the AVERAGE sortie — a plain HOLD,
   // not a headline. LANDSLIDE is reserved for genuinely abnormal outcomes.
@@ -795,6 +876,12 @@ function end(){
   if (S.opsDone>=3)     mods.push("SURGICAL — "+S.opsDone+" ops completed behind the line");
   if (S.kiaB>120)       mods.push("PYRRHIC — "+S.kiaB+" friendly KIA");
   if (S.ff===0 && S.opsDone>0) mods.push("CLEAN HANDS — zero friendly-fire from ordnance");
+  // decision discipline: the goalkeeper ledger
+  var windows=S.commits+S.holds+S.lapses;
+  if (S.vind>0)          mods.push("COLD BLOOD — "+S.vind+" of "+S.holds+" hold"+(S.holds===1?"":"s")+" vindicated");
+  if (S.lapses>=2)       mods.push("INDECISIVE — "+S.lapses+" windows lapsed without a call");
+  if (windows>=3 && S.holds===0 && S.lapses===0)
+                         mods.push("ACTION BIAS — every window committed; restraint untested");
   var opforDown=S.squads.filter(function(q){return q.side<0&&q.phase==="DOWN";}).length;
   if (opforDown===2)    mods.push("HOSTILE NET BROKEN — both opfor cells suppressed");
   var roster=S.squads[0].crew.map(function(m){
@@ -816,7 +903,20 @@ function end(){
   });
   saveProfile();
 }
+/* doctrine: one decision made between sorties that programs the auto-resolver.
+   AGG — 141 moves and works faster, runs hotter, hunts deep hostile ground.
+   CON — steadier hands, cooler ops, default objective picks. */
+function isAgg(){ return P.doctrine==="AGG"; }
+function renderDoctrine(){
+  var b=document.getElementById("doctrine");
+  b.textContent="DOCTRINE — "+(isAgg()?"AGGRESSIVE":"CONSERVATIVE");
+  b.classList.toggle("agg",isAgg());
+}
+document.getElementById("doctrine").addEventListener("click",function(){
+  P.doctrine=isAgg()?"CON":"AGG"; saveProfile(); renderDoctrine(); sndClick();
+});
 function showMenu(){
+  renderDoctrine();
   var lines=["<b>SORTIES</b> "+P.sorties+" · <b>HOLDS+</b> "+P.wins
     +(P.verdicts.length?"\n<b>RECORD</b> "+P.verdicts.join(" · "):"")];
   if (P.crew){
@@ -1307,11 +1407,13 @@ function tkSet(idx,items,hot,badge){
 }
 function renderTickers(){
   var q=me();
-  if (S.cue) tkSet(0,[[S.cue.verb+" "+S.cue.cost,"rq"],[S.cue.sq.name+" waiting on you","dim"]],"hot",Math.ceil(S.cue.left)+"s");
+  if (S.cue) tkSet(0,[[S.cue.verb+" "+S.cue.cost,"rq"],["early = strong, late = informed","dim"]],
+                   "hot",Math.ceil(S.cue.left)+"s·"+cueLev()+"%");
   else tkSet(0,[["no operative request pending","dim"],["141 op: "+q.phase.toLowerCase(),"dim"]]);
 
   var crew=q.crew.filter(function(m){return m.st==="OK";}).length;
-  tkSet(1,[["141 "+(q.urge?"URGED":"steady"),q.urge?"up":"ink"],[(q.phase==="WORK"?q.op.name:q.phase),"dim"]],
+  if (S.cue) tkSet(1,[["HOLD is a decision","rq"],["denied and logged — not a lapse","dim"]],"hot",crew+"/4");
+  else tkSet(1,[["141 "+(q.urge?"URGED":"steady"),q.urge?"up":"ink"],[(q.phase==="WORK"?q.op.name:q.phase),"dim"]],
           q.urge?"up":false, crew+"/4");
 
   var pst=pickStrike();
@@ -1339,6 +1441,7 @@ function oprow(m){
     +'<span class="opmed">'+meds+'</span>'
     +'</div>';
 }
+var lastSqHtml="", lastLedHtml="";       // DOM writes only when content actually changed
 function renderDeck(){
   drawForces();
   renderTickers();
@@ -1353,18 +1456,19 @@ function renderDeck(){
     var alive=q.crew.filter(function(m){return m.st==="OK";}).length;
     return '<span class="ally">'+q.name+' <b>'+alive+'/4</b></span>';
   }).join(" · ");
-  document.getElementById("squads").innerHTML = mineHtml
-    +'<div id="alliedline">'+alliedHtml+'</div>';
+  var sqHtml = mineHtml+'<div id="alliedline">'+alliedHtml+'</div>';
+  if (sqHtml!==lastSqHtml){ lastSqHtml=sqHtml; document.getElementById("squads").innerHTML=sqHtml; }
   // voxel stats: macro story — same groundPct the verdict uses
   var gpL=groundPct();
   var lastOp=S.receipts.length?S.receipts[S.receipts.length-1]:"no operations logged yet";
-  document.getElementById("ledger").innerHTML=
+  var ledHtml=
     '<div class="lrow"><span>REQ / CAS / MAT</span><span><b>'+(S.req|0)+'</b> / <b>'+S.cas+'</b> / <b>'+S.mat+'</b></span></div>'
     +'<div class="lrow"><span>GROUND</span><span><b class="up">'+Math.round(gpL*100)+'%</b> / <b class="bad">'+Math.round((1-gpL)*100)+'%</b></span></div>'
     +'<div class="lrow"><span>LINE KIA</span><span><b class="up">'+S.kiaB+'</b> / <b class="bad">'+S.kiaO+'</b></span></div>'
     +'<div class="lrow"><span>OPS DONE</span><span><b>'+S.opsDone+'</b> · ELAPSED <b>'+(180-S.t|0)+'s</b></span></div>'
     +'<div class="lrow"><span>HOSTILE NET</span><span><b class="bad">'+hos+'</b> active cell'+(hos===1?"":"s")+'</span></div>'
     +'<div style="margin-top:2px;border-top:1px dashed var(--line);padding-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+lastOp+'</div>';
+  if (ledHtml!==lastLedHtml){ lastLedHtml=ledHtml; document.getElementById("ledger").innerHTML=ledHtml; }
   document.getElementById("bclock").textContent=Math.max(0,S.t).toFixed(0);
   var tp=document.getElementById("tidepct");
   var gp2=(S.tide+1)/2;
@@ -1377,13 +1481,23 @@ function renderDeck(){
 function me(){ return S.squads[0]; }
 /* slot letter is the tile's identity; ticker row of the same letter is its informatics */
 var BTN=[
-  { slot:"A", label:function(){ return S.cue ? "APPROVE" : "NO REQ"; },
-    cost:function(){ return S.cue?S.cue.cost:""; },
+  { slot:"A", label:function(){ return S.cue ? "COMMIT" : "NO REQ"; },
+    cost:function(){ return S.cue?S.cue.cost+" · lev "+cueLev()+"%":""; },
     hot:function(){ return !!S.cue; }, can:function(){ return !!S.cue; },
-    fire:function(){ var c2=S.cue; S.cue=null; c2.yes(c2.sq); } },
-  { slot:"B", label:function(){ return me().urge?"URGING ▮":"URGE 141"; }, cost:function(){return "toggle";},
-    tog:function(){ return me().urge; }, can:function(){ return me().hp>0; },
-    fire:function(){ me().urge=!me().urge;
+    fire:function(){ var c2=S.cue, lev=cueLev(); S.cue=null;
+      S.lev=lev/100; S.commits++; judgeLater("COMMIT",c2,lev); mark("COM",true);
+      c2.yes(c2.sq); S.lev=1; } },
+  /* B doubles as the restraint verb: while a window is open, pressing B is an
+     EXPLICIT hold — a logged decision, judged later, distinct from a lapse. */
+  { slot:"B", label:function(){ return S.cue?"HOLD":(me().urge?"URGING ▮":"URGE 141"); },
+    cost:function(){ return S.cue?"deny — logged":"toggle"; },
+    hot:function(){ return !!S.cue; },
+    tog:function(){ return !S.cue&&me().urge; }, can:function(){ return me().hp>0; },
+    fire:function(){
+      if (S.cue){ var c3=S.cue; S.cue=null;
+        S.holds++; judgeLater("HOLD",c3,0); mark("HLD",true);
+        c3.no(c3.sq); tick("you: hold. watching it play out","team",true); return; }
+      me().urge=!me().urge;
       tick(me().urge?"you: push. 141: pushing":"you: steady. 141: copy","team"); } },
   { slot:"C", label:function(){ var st=pickStrike(); return st?st.label:"NO STRIKE"; },
     cost:function(){ var st=pickStrike(); return st?"−"+st.cost+" MAT":"needs MAT"; },
@@ -1415,7 +1529,7 @@ function renderButtons(){
 BTN_IDS.forEach(function(id,k){
   document.getElementById(id).addEventListener("click",function(){
     if (!BTN[k].can()||S.over) return;
-    if (S.arm[k]>0){ S.arm[k]=0; BTN[k].fire(); renderDeck(); }
+    if (S.arm[k]>0){ S.arm[k]=0; sndClick(); BTN[k].fire(); renderDeck(); }
     else { for(var j=0;j<5;j++) S.arm[j]=0; S.arm[k]=2.5; renderButtons(); }
   });
 });
@@ -1437,6 +1551,7 @@ document.getElementById("again").addEventListener("click",function(){
   reset(); S.paused=true; showMenu();
 });
 document.getElementById("launch").addEventListener("click",function(){
+  ac();                                            // audio unlocks on this gesture
   document.getElementById("menu").classList.remove("on");
   S.paused=false;
   var bp=document.getElementById("btnpause");
